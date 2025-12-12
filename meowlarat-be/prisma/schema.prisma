@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model artikel {
+  id       Int    @id @default(autoincrement())
+  img_url  String @db.VarChar(255)
+  nama     String @db.VarChar(255)
+  category String @db.VarChar(255)
+  teks     String
+}
+
+model cat {
+  id            Int             @id @default(autoincrement())
+  img_url       String          @db.VarChar(255)
+  nama          String          @db.VarChar(255)
+  age           String          @db.VarChar(255)
+  gender        String          @db.VarChar(10)
+  ras           String          @db.VarChar(255)
+  karakteristik String
+  isVaccinated  Boolean   @map("isvaccinated")
+  isAdopted     Boolean?  @map("isadopted")       // Optional Boolean (can be NULL)
+  adopter        String?         @db.VarChar(255) // Foreign Key (Optional/NULLable)
+  adoptdate      DateTime?       @db.Date        // Date type in PostgreSQL maps to DateTime in Prisma
+  isTaken       Boolean  @default(false)
+  users         users?          @relation(fields: [adopter], references: [username], onDelete: NoAction, onUpdate: NoAction)
+  tanggungjawab tanggungjawab[]
+}
+
+model donasi {
+  id                           Int    @id @default(autoincrement())
+  nominal                      Int
+  pesan                        String
+  metode                       Int
+  username                     String @db.VarChar(255)
+  bukti_transfer               String? @db.VarChar(255) // <--- TAMBAHKAN INI
+  
+  // Relasi
+  metode_donasi_metodeTometode metode @relation("donasi_metodeTometode", fields: [metode], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users                        users  @relation(fields: [username], references: [username], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model laporan {
+  id        Int    @id @default(autoincrement())
+  category  String @db.VarChar(255)
+  lokasi    String @db.VarChar(255)
+  deskripsi String
+  img_url   String @db.VarChar(255)
+  notes     String
+}
+
+model metode {
+  id        Int      @id @default(autoincrement())
+  nama      String   @db.VarChar(255)
+  
+  // TAMBAHKAN @default("Transfer Bank") DI SINI:
+  category  String   @db.VarChar(255) @default("Transfer Bank") 
+  
+  logo      String?  @db.VarChar(255)
+  rek       String?  @db.VarChar(255)
+  an        String?  @db.VarChar(255)
+  isActive  Boolean  @default(true)
+
+  // Relasi
+  donasi_donasi_metodeTometode donasi[] @relation("donasi_metodeTometode")
+}
+
+model petplace {
+  id          Int     @id @default(autoincrement())
+  nama        String  @db.VarChar(255)
+  category    String  @db.VarChar(255) // Contoh: "Petshop", "Vet", "Grooming"
+  img_url     String  @db.VarChar(255)
+  address     String  @db.Text         // Alamat lengkap
+  latitude    Float   // Koordinat Y (misal: -6.9175)
+  longitude   Float   // Koordinat X (misal: 107.6191)
+  rating      Int     @default(5)      // Rating 1-5
+  description String? @db.Text         // Deskripsi singkat
+}
+
+model posts {
+  id        Int     @id @default(autoincrement())
+  teks      String
+  id_thread Int
+  username  String  @db.VarChar(255)
+  threads   threads @relation(fields: [id_thread], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users     users   @relation(fields: [username], references: [username], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model shelter {
+  id     Int    @id @default(autoincrement())
+  nama   String @db.VarChar(255)
+  lokasi String @db.VarChar(255)
+}
+
+model tanggungjawab {
+  id               Int     @id @default(autoincrement())
+  id_cat           Int
+  gambarmakanan1   String? @db.VarChar(255)
+  gambarmakanan2   String? @db.VarChar(255)
+  gambarmakanan3   String? @db.VarChar(255)
+  gambaraktivitas1 String? @db.VarChar(255)
+  gambaraktivitas2 String? @db.VarChar(255)
+  gambaraktivitas3 String? @db.VarChar(255)
+  gambarkotoran1   String? @db.VarChar(255)
+  gambarkotoran2   String? @db.VarChar(255)
+  gambarkotoran3   String? @db.VarChar(255)
+  cat              cat     @relation(fields: [id_cat], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model threads {
+  id       Int     @id @default(autoincrement())
+  title    String  @db.VarChar(255)
+  category String  @db.VarChar(255)
+  teks     String
+  username String  @db.VarChar(255)
+  posts    posts[]
+  users    users   @relation(fields: [username], references: [username], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model tokoonline {
+  id        Int     @id @default(autoincrement())
+  source    String  @db.VarChar(50)   // Contoh: "SHOPEE", "TOKOPEDIA"
+  nama      String  @db.VarChar(255)  // Contoh: "Petshop Murah"
+  deskripsi String  @db.Text          // Deskripsi singkat
+  link      String  @db.Text          // Link menuju toko
+  notes     String? @db.Text          // Opsional (catatan tambahan)
+}
+
+model users {
+  username String    @id @db.VarChar(255)
+  email    String    @unique @db.VarChar(255)
+  nama     String    @db.VarChar(255)
+  phone    String    @db.VarChar(15)
+  password String    @db.VarChar(255)
+  bio      String    @db.VarChar(255)
+  img_url  String    @db.VarChar(255)
+
+  resetPasswordToken   String?   @db.VarChar(255) // Menyimpan token unik
+  resetPasswordExpires DateTime?                  // Menyimpan waktu kadaluarsa token
+  
+  cat      cat[]
+  donasi   donasi[]
+  posts    posts[]
+  threads  threads[]
+}
