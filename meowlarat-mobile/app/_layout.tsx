@@ -21,6 +21,15 @@ export default function TabLayout() {
         }
       }}
     >
+      {/* 1. SEMBUNYIKAN INDEX (REDIRECT) */}
+      <Tabs.Screen
+        name="index"
+        options={{
+          href: null, // <--- INI KUNCINYA: Href null artinya "jangan tampilkan tombol ini"
+        }}
+      />
+
+      {/* 2. BERANDA (Tombol Asli) */}
       <Tabs.Screen
         name="beranda"
         options={{
@@ -30,6 +39,8 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* 3. ADOPSI */}
       <Tabs.Screen
         name="adopsi"
         options={{
