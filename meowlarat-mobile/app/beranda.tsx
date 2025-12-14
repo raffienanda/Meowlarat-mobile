@@ -54,7 +54,7 @@ export default function HomeScreen() {
             
             <TouchableOpacity 
               style={styles.ctaButton} 
-              onPress={() => router.push('/adopsi')}
+              onPress={() => router.push('/donasi')}
               activeOpacity={0.8}
             >
               <Text style={styles.ctaText}>Dukung Kami!</Text>

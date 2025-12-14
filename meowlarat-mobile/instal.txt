@@ -1,0 +1,8 @@
+fe : 
+
+npx expo install expo-image-picker
+npx expo install @react-native-async-storage/async-storage
+
+
+be :
+npm install bcryptjs

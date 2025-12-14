@@ -1,15 +1,13 @@
-// prisma/seed.js
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs'; // Pastikan sudah install: npm install bcryptjs
 
 const prisma = new PrismaClient();
 
 async function main() {
+  // --- BAGIAN 1: PETPLACE (Biarkan seperti semula) ---
   console.log('🌱 Memulai seeding data Petplaces...');
-
-  // Hapus data lama agar tidak duplikat saat di-run ulang (Opsional)
   await prisma.petplace.deleteMany();
 
-  // Data Dummy di sekitar Bandung
   const petplaces = [
     {
       nama: "Meow City Petshop",
@@ -21,88 +19,83 @@ async function main() {
       rating: 5,
       description: "Menyediakan makanan premium dan aksesoris lucu."
     },
-    {
-      nama: "Klinik Hewan Sehat",
-      category: "Vet",
-      img_url: "vet1.png",
-      address: "Jl. R.E. Martadinata No. 45, Bandung",
-      latitude: -6.9088,
-      longitude: 107.6195,
-      rating: 4,
-      description: "Dokter hewan berpengalaman 24 jam."
-    },
-    {
-      nama: "Grooming Centre PVJ",
-      category: "Grooming",
-      img_url: "grooming1.png",
-      address: "Paris Van Java, Sukajadi, Bandung",
-      latitude: -6.8897,
-      longitude: 107.5964,
-      rating: 5,
-      description: "Spa dan grooming terbaik untuk anabul kesayangan."
-    },
-    {
-      nama: "Pet Station Antapani",
-      category: "Petshop",
-      img_url: "petshop2.png",
-      address: "Jl. Terusan Jakarta No. 70, Antapani",
-      latitude: -6.9135,
-      longitude: 107.6599,
-      rating: 4,
-      description: "Lengkap dan murah meriah."
-    },
-    {
-      nama: "Pusat Pakan Kucing Setiabudi",
-      category: "Petshop",
-      img_url: "petshop1.png",
-      address: "Jl. Dr. Setiabudi No. 120, Bandung",
-      latitude: -6.8631,
-      longitude: 107.5960,
-      rating: 5,
-      description: "Distributor resmi Royal Canin dan Pro Plan."
-    }
   ];
 
   for (const place of petplaces) {
-    await prisma.petplace.create({
-      data: place,
-    });
+    await prisma.petplace.create({ data: place });
   }
+  console.log(`✅ Data petplace selesai.`);
 
-  console.log(`✅ Berhasil menambahkan ${petplaces.length} data petplace!`);
-
+  // --- BAGIAN 2: TOKO ONLINE (Biarkan seperti semula) ---
   console.log('🌱 Memulai seeding Toko Online...');
-  await prisma.tokoonline.deleteMany(); // Reset data lama
-
+  await prisma.tokoonline.deleteMany();
   const onlineShops = [
     {
       source: "SHOPEE",
       nama: "Toko Kucing Gemoy",
-      deskripsi: "Menjual perlengkapan grooming dan makanan dengan harga terjangkau.",
+      deskripsi: "Menjual perlengkapan grooming.",
       link: "https://shopee.co.id",
       notes: "Promo setiap tanggal kembar"
-    },
-    {
-      source: "TOKOPEDIA",
-      nama: "MeongCare Official",
-      deskripsi: "Menjual produk kesehatan dan perawatan premium dari dokter hewan.",
-      link: "https://tokopedia.com",
-      notes: "Free ongkir se-Bandung"
-    },
-    {
-      source: "TIKTOK SHOP",
-      nama: "CatLovers Store",
-      deskripsi: "Makanan basah dan vitamin favorit viral.",
-      link: "https://tiktok.com",
-      notes: "Live setiap malam minggu"
     }
   ];
-
   for (const shop of onlineShops) {
     await prisma.tokoonline.create({ data: shop });
   }
-  
-  console.log('✅ Seeding Toko Online Selesai!'); 
+  console.log('✅ Data toko online selesai.');
+
+
+  // --- BAGIAN 4: USER IWAN (UPDATED) ---
+  console.log('👤 Membuat User Iwan...');
+
+  const userData = {
+    username: 'iwan',
+    email: 'iwan@gmail.com',
+    passwordRaw: '12345',
+    nama: 'Iwan Fals',
+    phone: '081234567890',
+    bio: 'Pecinta kucing jalanan',
+    img_url: 'default.jpg'
+  };
+
+  // 1. Cek & Hapus jika email/username sudah ada biar gak bentrok
+  const existingUser = await prisma.users.findFirst({
+    where: {
+      OR: [
+        { username: userData.username },
+        { email: userData.email }
+      ]
+    }
+  });
+
+  if (existingUser) {
+    console.log(`⚠️ User lama ditemukan (${existingUser.username}), menghapus data lama...`);
+    // Hapus relasi dulu kalau ada (opsional, tergantung schema constraint)
+    // await prisma.cat.updateMany({ where: { adopter: existingUser.username }, data: { adopter: null, isAdopted: false } });
+    
+    await prisma.users.delete({
+      where: { username: existingUser.username }
+    });
+  }
+
+  // 2. Buat Hash Password
+  const hashedPassword = await bcrypt.hash(userData.passwordRaw, 10);
+
+  // 3. Buat User Baru
+  const newUser = await prisma.users.create({
+    data: {
+      username: userData.username,
+      email: userData.email,
+      nama: userData.nama,
+      password: hashedPassword, // Simpan password yang sudah di-hash
+      phone: userData.phone,
+      bio: userData.bio,
+      img_url: userData.img_url
+    },
+  });
+
+  console.log(`✅ SUKSES! Login User:`);
+  console.log(`   Username: ${userData.username}`);
+  console.log(`   Password: ${userData.passwordRaw}`);
 }
 
 main()

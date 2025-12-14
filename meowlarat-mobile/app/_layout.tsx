@@ -8,6 +8,7 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: Colors.primary,
+        // ...style lainnya biarkan sama
         tabBarStyle: {
           backgroundColor: Colors.white,
           borderTopWidth: 1,
@@ -15,21 +16,9 @@ export default function TabLayout() {
           paddingBottom: 5,
           height: 60,
         },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-        }
       }}
     >
-      {/* 1. SEMBUNYIKAN INDEX (REDIRECT) */}
-      <Tabs.Screen
-        name="index"
-        options={{
-          href: null, // <--- INI KUNCINYA: Href null artinya "jangan tampilkan tombol ini"
-        }}
-      />
-
-      {/* 2. BERANDA (Tombol Asli) */}
+      {/* Tab Beranda */}
       <Tabs.Screen
         name="beranda"
         options={{
@@ -39,8 +28,20 @@ export default function TabLayout() {
           ),
         }}
       />
+      
+      {/* --- TAMBAHKAN BAGIAN INI (DONASI) --- */}
+      <Tabs.Screen
+        name="donasi"
+        options={{
+          title: 'Donasi',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="heart" size={size} color={color} />
+          ),
+        }}
+      />
+      {/* ----------------------------------- */}
 
-      {/* 3. ADOPSI */}
+      {/* Tab Adopsi */}
       <Tabs.Screen
         name="adopsi"
         options={{
@@ -50,6 +51,27 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      <Tabs.Screen
+        name="profil"
+        options={{
+          title: 'Akun',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-circle" size={size} color={color} />
+          ),
+        }}
+      />
+      
+      <Tabs.Screen
+        name="index"
+        options={{
+          href: null, // <--- INI KUNCINYA: Href null artinya "jangan tampilkan tombol ini"
+        }}
+      />
+
+      {/* Pastikan Modal/Halaman lain disembunyikan dari tab jika ada */}
+      <Tabs.Screen name="modal" options={{ href: null }} />
+      {/* Jika kamu pakai beranda.tsx kemarin dan index untuk redirect, sembunyikan juga index */}
     </Tabs>
   );
 }
