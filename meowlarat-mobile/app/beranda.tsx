@@ -63,10 +63,8 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.heroImageContainer}>
-            {/* Pastikan gambar 'cat.png' ada di folder assets/images/ */}
-            {/* Jika belum ada, ganti require dengan URI gambar online sementara */}
             <Image 
-              source={require('../assets/images/beranda-cat.png')} // GANTI INI dengan cat.png jika sudah ada
+              source={require('../assets/images/beranda-cat.png')}
               style={styles.heroImage}
               resizeMode="contain"
             />
@@ -128,7 +126,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: Colors.background,
   },
   
   // Hero Styles
@@ -179,14 +177,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   heroImageContainer: {
-    width: 140,
-    height: 140,
+    width: 170,
+    height: 170,
     justifyContent: 'center',
     alignItems: 'center',
   },
   heroImage: {
-    width: '100%',
-    height: '100%',
+    width: '140%',
+    height: '140%',
   },
 
   // Stats Styles
