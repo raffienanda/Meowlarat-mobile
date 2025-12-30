@@ -114,23 +114,23 @@ async function authRoutes(fastify, options) {
     console.log(resetUrl);
     console.log("========================================");
 
-    // const mailOptions = {
-    //   from: 'MeowLarat Support <no-reply@meowlarat.com>',
-    //   to: email,
-    //   subject: 'Reset Password MeowLarat',
-    //   text: `Kamu menerima email ini karena ada permintaan reset password.\n\n` +
-    //         `Silakan klik link berikut untuk mereset password:\n\n${resetUrl}\n\n` +
-    //         `Link ini berlaku selama 1 jam.\n` +
-    //         `Jika kamu tidak meminta ini, abaikan saja.`
-    // };
+    const mailOptions = {
+      from: 'MeowLarat Support <no-reply@meowlarat.com>',
+      to: email,
+      subject: 'Reset Password MeowLarat',
+      text: `Kamu menerima email ini karena ada permintaan reset password.\n\n` +
+            `Silakan klik link berikut untuk mereset password:\n\n${resetUrl}\n\n` +
+            `Link ini berlaku selama 1 jam.\n` +
+            `Jika kamu tidak meminta ini, abaikan saja.`
+    };
 
-    // try {
-    //   await transporter.sendMail(mailOptions);
-    //   return { message: 'Link reset telah dikirim ke email Anda.' };
-    // } catch (error) {
-    //   console.error(error);
-    //   return reply.code(500).send({ message: 'Gagal mengirim email' });
-    // }
+    try {
+      await transporter.sendMail(mailOptions);
+      return { message: 'Link reset telah dikirim ke email Anda.' };
+    } catch (error) {
+      console.error(error);
+      return reply.code(500).send({ message: 'Gagal mengirim email' });
+    }
   });
 
   // === BAGIAN BARU: RESET PASSWORD ===

@@ -5,11 +5,12 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 import { metode } from '../types';
 
-// ⚠️ GANTI DENGAN IP LAPTOP KAMU
+// ⚠️ GANTI IP SESUAI CONFIG KAMU
 const API_URL = 'http://192.168.18.12:3000'; 
 
 export default function DonasiScreen() {
@@ -26,7 +27,7 @@ export default function DonasiScreen() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // 1. Ambil Data Metode Pembayaran dari Backend
+  // Ambil data metode saat load
   useEffect(() => {
     fetchMetode();
   }, []);
@@ -44,13 +45,12 @@ export default function DonasiScreen() {
     }
   };
 
-  // 2. Fungsi Pilih Gambar dari Galeri
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.7, // Kompres sedikit biar upload cepat
+      quality: 0.7, 
     });
 
     if (!result.canceled) {
@@ -58,27 +58,45 @@ export default function DonasiScreen() {
     }
   };
 
-  // 3. Fungsi Submit Donasi
   const handleSubmit = async () => {
-    // Validasi
+    // Validasi Input
     if (!nominal) return Alert.alert("Peringatan", "Mohon isi nominal donasi");
     if (!selectedMetode) return Alert.alert("Peringatan", "Pilih metode pembayaran");
     if (!image) return Alert.alert("Peringatan", "Sertakan bukti transfer");
 
+    // CEK SESSION (LOGIN)
+    let userSession = null;
+    try {
+        const jsonValue = await AsyncStorage.getItem('user_session');
+        if (jsonValue) {
+            userSession = JSON.parse(jsonValue);
+        }
+    } catch (e) {
+        console.error("Gagal baca sesi");
+    }
+
+    if (!userSession) {
+        Alert.alert(
+            "Belum Login", 
+            "Mohon login terlebih dahulu untuk melakukan donasi.",
+            [
+                { text: "Batal", style: "cancel" },
+                { text: "Login", onPress: () => router.push('/profil') }
+            ]
+        );
+        return;
+    }
+
     setSubmitting(true);
 
-    // Hardcode username (Karena belum ada fitur Login di mobile)
-    const dummyUser = "budi_user"; 
-
     try {
-      // Siapkan FormData untuk upload file
       const formData = new FormData();
       formData.append('nominal', nominal);
       formData.append('pesan', pesan);
-      formData.append('metode', selectedMetode.toString()); // Backend butuh ID metode
-      formData.append('username', dummyUser);
+      formData.append('metode', selectedMetode.toString()); 
+      // GUNAKAN USERNAME ASLI
+      formData.append('username', userSession.username); 
 
-      // Append Gambar
       const filename = image.split('/').pop();
       const match = /\.(\w+)$/.exec(filename || '');
       const type = match ? `image/${match[1]}` : `image`;
@@ -87,9 +105,8 @@ export default function DonasiScreen() {
         uri: image,
         name: filename || 'upload.jpg',
         type,
-      } as any); // 'as any' diperlukan karena tipe FormData React Native agak beda dengan Web standard
+      } as any); 
 
-      // Kirim ke Backend
       const response = await fetch(`${API_URL}/api/donasi`, {
         method: 'POST',
         body: formData,
@@ -102,7 +119,7 @@ export default function DonasiScreen() {
 
       if (response.ok) {
         Alert.alert("Terima Kasih!", "Donasi kamu berhasil dikirim dan menunggu verifikasi.", [
-            { text: "OK", onPress: () => router.replace('/') } // Balik ke beranda
+            { text: "OK", onPress: () => router.replace('/') } 
         ]);
       } else {
         Alert.alert("Gagal", result.message || "Terjadi kesalahan saat mengirim donasi.");
@@ -116,7 +133,6 @@ export default function DonasiScreen() {
     }
   };
 
-  // Helper untuk mendapatkan info rekening yang dipilih
   const currentMetode = metodes.find(m => m.id === selectedMetode);
 
   return (
@@ -167,7 +183,6 @@ export default function DonasiScreen() {
                             ]}
                             onPress={() => setSelectedMetode(m.id)}
                         >
-                            {/* Jika ada logo di backend, bisa ditampilkan. Disini kita pakai Text dulu */}
                             <Text style={[
                                 styles.methodText, 
                                 selectedMetode === m.id && styles.methodTextActive
@@ -177,7 +192,7 @@ export default function DonasiScreen() {
                 </ScrollView>
             )}
 
-            {/* Detail Rekening (Muncul jika metode dipilih) */}
+            {/* Detail Rekening */}
             {currentMetode && (
                 <View style={styles.rekInfo}>
                     <Text style={styles.rekTitle}>Silakan transfer ke:</Text>
@@ -245,7 +260,7 @@ const styles = StyleSheet.create({
     borderColor: '#e1e1e1',
     fontSize: 16
   },
-  textArea: { textAlignVertical: 'top' }, // Untuk Android biar teks mulai dari atas
+  textArea: { textAlignVertical: 'top' }, 
   
   methodScroll: { flexDirection: 'row', marginBottom: 10 },
   methodCard: {
