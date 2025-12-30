@@ -1,11 +1,18 @@
+// meowlarat-mobile/app/beranda.tsx
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { 
+  StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, 
+  RefreshControl, Dimensions, ImageBackground 
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 
-const API_URL = 'http://192.168.18.12:3000'; // Ganti IP
+// ⚠️ GANTI DENGAN IP LAPTOP KAMU
+const API_URL = 'http://192.168.18.12:3000';
+
+const { width } = Dimensions.get('window');
 
 export default function BerandaScreen() {
   const router = useRouter();
@@ -18,7 +25,7 @@ export default function BerandaScreen() {
       const data = await response.json();
       setStats(data);
     } catch (error) {
-      console.log('Error stats:', error);
+      console.log('Gagal ambil stats:', error);
     }
   };
 
@@ -29,86 +36,152 @@ export default function BerandaScreen() {
     fetchStats().then(() => setRefreshing(false));
   }, []);
 
-  const features = [
-    { id: 1, name: 'Donasi', icon: 'heart', route: '/donasi', color: '#ff6b6b' },
-    { id: 2, name: 'Artikel', icon: 'newspaper', route: '/artikel', color: '#4ecdc4' },
-    { id: 3, name: 'Pet Place', icon: 'map', route: '/petplace', color: '#ffe66d' },
-    { id: 4, name: 'Tanggung Jawab', icon: 'shield-checkmark', route: '/profil', color: '#1a535c' }, // Link ke profil dulu
-  ];
-
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Halo, Cat Lovers! 👋</Text>
-            <Text style={styles.subGreeting}>Ayo bantu kucing jalanan.</Text>
-          </View>
-          <Image source={require('../assets/images/logo.png')} style={styles.logo} />
-        </View>
-
-        {/* Hero Section */}
-        <View style={styles.heroCard}>
-          <Image source={require('../assets/images/beranda-cat.png')} style={styles.heroImage} resizeMode="cover" />
-          <View style={styles.heroOverlay}>
-             <Text style={styles.heroTitle}>MeowLarat</Text>
-             <Text style={styles.heroSubtitle}>Platform peduli kucing jalanan.</Text>
-          </View>
-        </View>
-
-        {/* Feature Grid (Menu Shortcut) */}
-        <Text style={styles.sectionTitle}>Fitur Utama</Text>
-        <View style={styles.featureGrid}>
-          {features.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.featureItem} onPress={() => router.push(item.route as any)}>
-              <View style={[styles.iconCircle, { backgroundColor: item.color }]}>
-                <Ionicons name={item.icon as any} size={28} color="#fff" />
-              </View>
-              <Text style={styles.featureText}>{item.name}</Text>
+    <View style={styles.container}>
+      <ScrollView 
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Navbar-like Header */}
+        <SafeAreaView style={styles.header}>
+            <Image source={require('../assets/images/logo.png')} style={styles.logo} />
+            <Text style={styles.appName}>MeowLarat</Text>
+            <TouchableOpacity onPress={() => router.push('/profil')}>
+                <Ionicons name="person-circle-outline" size={32} color={Colors.primary} />
             </TouchableOpacity>
-          ))}
+        </SafeAreaView>
+
+        {/* HERO SECTION - Mirip Web */}
+        <View style={styles.heroContainer}>
+            <ImageBackground 
+                source={require('../assets/images/beranda-cat.png')} 
+                style={styles.heroImage}
+                imageStyle={{ borderRadius: 0 }}
+            >
+                <View style={styles.heroOverlay}>
+                    <Text style={styles.heroTitle}>Temukan Teman Sejati{"\n"}yang Setia Menemanimu</Text>
+                    <Text style={styles.heroSubtitle}>
+                        Adopsi kucing terlantar dan berikan mereka rumah yang penuh kasih sayang.
+                    </Text>
+                    <View style={styles.heroButtons}>
+                        <TouchableOpacity style={styles.btnPrimary} onPress={() => router.push('/adopsi')}>
+                            <Text style={styles.btnTextPrimary}>Adopsi Sekarang</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.btnSecondary} onPress={() => router.push('/artikel')}>
+                            <Text style={styles.btnTextSecondary}>Pelajari Dulu</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </ImageBackground>
         </View>
 
-        {/* Statistik */}
-        <Text style={styles.sectionTitle}>Statistik Saat Ini</Text>
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.ready}</Text>
-            <Text style={styles.statLabel}>Siap Adopsi</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.adopted}</Text>
-            <Text style={styles.statLabel}>Teradopsi</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.shelters}</Text>
-            <Text style={styles.statLabel}>Mitra Shelter</Text>
-          </View>
+        {/* MENU FITUR (Grid Bulat) */}
+        <View style={styles.menuContainer}>
+            <Text style={styles.sectionTitle}>Layanan Kami</Text>
+            <View style={styles.menuGrid}>
+                <MenuIcon icon="heart" label="Donasi" color="#ff6b6b" onPress={() => router.push('/donasi')} />
+                <MenuIcon icon="book" label="Artikel" color="#4ecdc4" onPress={() => router.push('/artikel')} />
+                <MenuIcon icon="map" label="Pet Place" color="#ffe66d" onPress={() => router.push('/petplace')} />
+                <MenuIcon icon="shield-checkmark" label="Tanggung Jawab" color="#1a535c" onPress={() => router.push('/lapor')} />
+            </View>
         </View>
+
+        {/* STATISTIK SECTION */}
+        <View style={styles.statsSection}>
+            <Text style={styles.statsHeader}>Dampak Kami Sejauh Ini</Text>
+            <View style={styles.statsRow}>
+                <StatCard number={stats.ready || 0} label="Siap Adopsi" icon="paw" />
+                <StatCard number={stats.adopted || 0} label="Teradopsi" icon="home" />
+                <StatCard number={stats.shelters || 0} label="Mitra Shelter" icon="business" />
+            </View>
+        </View>
+
+        {/* FOOTER SIMPLE */}
+        <View style={styles.footer}>
+            <Text style={styles.footerText}>© 2025 MeowLarat Mobile App</Text>
+        </View>
+
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
+// Komponen Kecil untuk Kerapian
+const MenuIcon = ({ icon, label, color, onPress }: any) => (
+    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+        <View style={[styles.iconCircle, { backgroundColor: color }]}>
+            <Ionicons name={icon} size={24} color="#fff" />
+        </View>
+        <Text style={styles.menuLabel}>{label}</Text>
+    </TouchableOpacity>
+);
+
+const StatCard = ({ number, label, icon }: any) => (
+    <View style={styles.statCard}>
+        <Ionicons name={icon as any} size={28} color={Colors.primary} style={{ marginBottom: 5 }} />
+        <Text style={styles.statNumber}>{number}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+    </View>
+);
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center' },
-  greeting: { fontSize: 20, fontWeight: 'bold', color: Colors.primary },
-  subGreeting: { fontSize: 14, color: '#666' },
-  logo: { width: 50, height: 50, resizeMode: 'contain' },
-  heroCard: { margin: 20, height: 180, borderRadius: 15, overflow: 'hidden' },
-  heroImage: { width: '100%', height: '100%' },
-  heroOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 15, backgroundColor: 'rgba(0,0,0,0.4)' },
-  heroTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  heroSubtitle: { color: '#eee', fontSize: 14 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginHorizontal: 20, marginBottom: 10, marginTop: 10, color: '#333' },
-  featureGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 20 },
-  featureItem: { width: '23%', alignItems: 'center', marginBottom: 15 },
-  iconCircle: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 5, elevation: 3 },
-  featureText: { fontSize: 12, textAlign: 'center', color: '#555', fontWeight: '500' },
-  statsContainer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 30 },
-  statCard: { width: '31%', backgroundColor: '#f8f9fa', padding: 15, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#eee' },
-  statNumber: { fontSize: 24, fontWeight: 'bold', color: Colors.primary },
-  statLabel: { fontSize: 12, color: '#666', marginTop: 5 },
+  container: { flex: 1, backgroundColor: Colors.background }, // Background Kuning Muda
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 20, 
+    paddingVertical: 10,
+    backgroundColor: Colors.white,
+    elevation: 2
+  },
+  logo: { width: 35, height: 35, resizeMode: 'contain' },
+  appName: { fontSize: 18, fontWeight: 'bold', color: Colors.primary, marginLeft: 10, flex: 1 },
+  
+  heroContainer: { height: 320, width: '100%' },
+  heroImage: { flex: 1, justifyContent: 'center' },
+  heroOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'center', 
+    padding: 20 
+  },
+  heroTitle: { 
+    fontSize: 26, 
+    fontWeight: 'bold', 
+    color: '#fff', 
+    marginBottom: 10, 
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowRadius: 10
+  },
+  heroSubtitle: { 
+    fontSize: 14, 
+    color: '#eee', 
+    textAlign: 'center', 
+    marginBottom: 20, 
+    lineHeight: 20 
+  },
+  heroButtons: { flexDirection: 'row', justifyContent: 'center', gap: 15 },
+  btnPrimary: { backgroundColor: Colors.primary, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 25 },
+  btnSecondary: { borderWidth: 1, borderColor: '#fff', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 25 },
+  btnTextPrimary: { color: '#fff', fontWeight: 'bold' },
+  btnTextSecondary: { color: '#fff', fontWeight: 'bold' },
+
+  menuContainer: { padding: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text, marginBottom: 15 },
+  menuGrid: { flexDirection: 'row', justifyContent: 'space-between' },
+  menuItem: { alignItems: 'center' },
+  iconCircle: { width: 55, height: 55, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 5, elevation: 3 },
+  menuLabel: { fontSize: 12, color: Colors.text },
+
+  statsSection: { padding: 20, backgroundColor: Colors.white, marginHorizontal: 20, borderRadius: 15, elevation: 2, marginBottom: 20 },
+  statsHeader: { fontSize: 16, fontWeight: 'bold', color: Colors.text, marginBottom: 15, textAlign: 'center' },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  statCard: { alignItems: 'center', flex: 1 },
+  statNumber: { fontSize: 22, fontWeight: 'bold', color: Colors.primary },
+  statLabel: { fontSize: 12, color: Colors.gray },
+
+  footer: { padding: 20, alignItems: 'center', paddingBottom: 40 },
+  footerText: { color: '#aaa', fontSize: 12 }
 });
