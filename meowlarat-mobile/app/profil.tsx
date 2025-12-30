@@ -145,7 +145,9 @@ export default function ProfilScreen() {
 
           <View style={styles.registerContainer}>
             <Text style={{color: '#666'}}>Belum punya akun? </Text>
-            <TouchableOpacity><Text style={styles.linkText}>Daftar (Web)</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/register')}>
+               <Text style={styles.linkText}>Daftar Sekarang</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </SafeAreaView>
