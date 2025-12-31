@@ -8,23 +8,20 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 
-// ⚠️ GANTI DENGAN IP LAPTOP KAMU
+// GANTI DENGAN IP LAPTOP KAMU
 const API_URL = 'http://192.168.18.12:3000'; 
 
 export default function ProfilScreen() {
   const router = useRouter();
   
-  // State Aplikasi
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<any>(null);
 
-  // State Form Login
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
-  // 1. Cek Status Login saat aplikasi dibuka
   useEffect(() => {
     checkLoginStatus();
   }, []);
@@ -33,7 +30,12 @@ export default function ProfilScreen() {
     try {
       const jsonValue = await AsyncStorage.getItem('user_session');
       if (jsonValue != null) {
-        setUserData(JSON.parse(jsonValue));
+        const session = JSON.parse(jsonValue);
+        if (session.user) {
+          setUserData(session.user);
+        } else {
+          setUserData(session);
+        }
         setIsLoggedIn(true);
       }
     } catch(e) {
@@ -43,46 +45,33 @@ export default function ProfilScreen() {
     }
   };
 
-  // 2. Fungsi Login (Konek ke Backend)
   const handleLogin = async () => {
-    if (!username || !password) {
-      Alert.alert("Error", "Username dan Password wajib diisi");
-      return;
-    }
-
+    if (!username || !password) return Alert.alert("Error", "Isi semua data");
     setLoginLoading(true);
-
     try {
-      // Panggil API Login Backend
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-
       const result = await response.json();
 
       if (response.ok) {
-        // Simpan data user ke HP
-        const userToSave = result.data || result.user; // Sesuaikan dengan response backend kamu
-        await AsyncStorage.setItem('user_session', JSON.stringify(userToSave));
-        
-        setUserData(userToSave);
+        const sessionData = { token: result.token, user: result.user };
+        await AsyncStorage.setItem('user_session', JSON.stringify(sessionData));
+        setUserData(sessionData.user);
         setIsLoggedIn(true);
         Alert.alert("Berhasil", "Selamat datang kembali!");
       } else {
-        Alert.alert("Gagal Login", result.message || "Username/Password salah");
+        Alert.alert("Gagal", result.message || "Login gagal");
       }
     } catch (error) {
-      Alert.alert("Error", "Gagal menghubungi server. Cek koneksi internet.");
+      Alert.alert("Error", "Gagal koneksi server.");
     } finally {
       setLoginLoading(false);
     }
   };
 
-  // 3. Fungsi Logout
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem('user_session');
@@ -91,16 +80,11 @@ export default function ProfilScreen() {
       setUsername('');
       setPassword('');
       Alert.alert("Logout", "Kamu telah keluar.");
-    } catch(e) {
-      console.error("Gagal logout");
-    }
+    } catch(e) {}
   };
 
-  if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color={Colors.primary}/></View>;
-  }
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={Colors.primary}/></View>;
 
-  // --- TAMPILAN JIKA BELUM LOGIN (FORM LOGIN) ---
   if (!isLoggedIn) {
     return (
       <SafeAreaView style={styles.container}>
@@ -111,36 +95,16 @@ export default function ProfilScreen() {
 
           <View style={styles.inputContainer}>
             <Ionicons name="person-outline" size={20} color="#666" style={styles.icon} />
-            <TextInput 
-              style={styles.input} 
-              placeholder="Username" 
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-            />
+            <TextInput style={styles.input} placeholder="Username" value={username} onChangeText={setUsername} autoCapitalize="none" />
           </View>
 
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.icon} />
-            <TextInput 
-              style={styles.input} 
-              placeholder="Password" 
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+            <TextInput style={styles.input} placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
           </View>
 
-          <TouchableOpacity 
-            style={[styles.btn, styles.btnLogin]} 
-            onPress={handleLogin}
-            disabled={loginLoading}
-          >
-            {loginLoading ? (
-               <ActivityIndicator color="white" />
-            ) : (
-               <Text style={styles.btnText}>Masuk</Text>
-            )}
+          <TouchableOpacity style={[styles.btn, styles.btnLogin]} onPress={handleLogin} disabled={loginLoading}>
+            {loginLoading ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>Masuk</Text>}
           </TouchableOpacity>
 
           <View style={styles.registerContainer}>
@@ -154,7 +118,6 @@ export default function ProfilScreen() {
     );
   }
 
-  // --- TAMPILAN JIKA SUDAH LOGIN (PROFIL USER) ---
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.profileContent}>
@@ -168,8 +131,13 @@ export default function ProfilScreen() {
         </View>
 
         <View style={styles.menuSection}>
-          <MenuItem icon="paw" text="Riwayat Adopsi Saya" />
-          <MenuItem icon="heart" text="Donasi Saya" />
+          {/* MENU YANG SUDAH DIAKTIFKAN */}
+          <MenuItem 
+            icon="paw" 
+            text="Riwayat Adopsi Saya" 
+            onPress={() => router.push('/riwayat')} // <-- Mengarah ke halaman baru
+          />
+          <MenuItem icon="heart" text="Donasi Saya" onPress={() => router.push('/donasi')} />
           <MenuItem icon="settings" text="Pengaturan Akun" />
         </View>
 
@@ -181,9 +149,9 @@ export default function ProfilScreen() {
   );
 }
 
-// Komponen Menu Kecil
-const MenuItem = ({ icon, text }: { icon: any, text: string }) => (
-  <TouchableOpacity style={styles.menuItem}>
+// Komponen Menu Diperbarui (Menerima onPress)
+const MenuItem = ({ icon, text, onPress }: { icon: any, text: string, onPress?: () => void }) => (
+  <TouchableOpacity style={styles.menuItem} onPress={onPress}>
     <Ionicons name={icon} size={24} color={Colors.primary} />
     <Text style={styles.menuText}>{text}</Text>
     <Ionicons name="chevron-forward" size={20} color="#ccc" />
@@ -193,8 +161,6 @@ const MenuItem = ({ icon, text }: { icon: any, text: string }) => (
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  
-  // Login Styles
   loginContent: { flex: 1, padding: 30, justifyContent: 'center' },
   logo: { width: 100, height: 100, alignSelf: 'center', marginBottom: 20 },
   title: { fontSize: 28, fontWeight: 'bold', color: Colors.primary, textAlign: 'center', marginBottom: 5 },
@@ -204,8 +170,6 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 16, paddingVertical: 8 },
   registerContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
   linkText: { color: Colors.primary, fontWeight: 'bold' },
-
-  // Profile Styles
   profileContent: { padding: 20, alignItems: 'center' },
   headerProfile: { alignItems: 'center', marginBottom: 30, marginTop: 20 },
   avatar: { width: 120, height: 120, borderRadius: 60, marginBottom: 15, borderWidth: 3, borderColor: Colors.primary },
@@ -214,8 +178,6 @@ const styles = StyleSheet.create({
   menuSection: { width: '100%', marginBottom: 30 },
   menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   menuText: { flex: 1, fontSize: 16, marginLeft: 15, color: '#333' },
-
-  // Buttons
   btn: { padding: 15, borderRadius: 10, alignItems: 'center', width: '100%' },
   btnLogin: { backgroundColor: Colors.primary, marginTop: 10 },
   btnLogout: { backgroundColor: Colors.danger, marginTop: 10 },

@@ -1,129 +1,123 @@
 import fs from 'fs';
 import path from 'path';
-import { pipeline } from 'stream/promises'; // ✅ FIX: Import langsung versi Promise (pengganti pump)
-import { PrismaClient } from '@prisma/client'; 
+import util from 'util';
+import { pipeline } from 'stream';
+import { fileURLToPath } from 'url';
 
-const prisma = new PrismaClient();
+// Setup __dirname untuk ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const pump = util.promisify(pipeline);
 
-async function tanggungjawabRoutes(fastify, options) {
-
-  // GET: Ambil status form berdasarkan ID Kucing
-  fastify.get('/:catId', async (request, reply) => {
-    const { catId } = request.params;
-    
-    const cat = await prisma.cat.findUnique({
-      where: { id: parseInt(catId) },
-      include: { tanggungjawab: true } 
-    });
-
-    if (!cat || !cat.adoptdate) {
-      return reply.status(404).send({ message: 'Kucing belum diadopsi atau tidak ditemukan' });
-    }
-
-    const today = new Date();
-    const adoptDate = new Date(cat.adoptdate);
-    const diffTime = Math.abs(today - adoptDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-
-    const report = cat.tanggungjawab[0] || {};
-
-    return {
-      catName: cat.nama,
-      catImage: cat.img_url,
-      adoptDate: cat.adoptdate,
-      daysAdopted: diffDays,
-      data: report,
-      locks: {
-        // Logika Lock: Hanya kunci jika BELUM waktunya.
-        // Jika sudah lewat (expired), tetap terbuka (false) agar bisa dilihat, 
-        // tapi upload akan diblokir di endpoint POST.
-        week1: false, 
-        week2: diffDays < 8, 
-        week3: diffDays < 15 
-      }
-    };
-  });
-
-  // POST: Submit Laporan per Minggu
-  fastify.post('/:catId/week/:weekNum', async (request, reply) => {
-    const { catId, weekNum } = request.params;
-    
-    // 1. VALIDASI KEAMANAN: Cek apakah waktu pelaporan sudah lewat?
-    const cat = await prisma.cat.findUnique({ where: { id: parseInt(catId) } });
-    if (!cat || !cat.adoptdate) return reply.status(404).send({ message: 'Kucing tidak ditemukan' });
-
-    const today = new Date();
-    const adoptDate = new Date(cat.adoptdate);
-    const diffDays = Math.ceil(Math.abs(today - adoptDate) / (1000 * 60 * 60 * 24));
-    
-    // Batas waktu: Week 1 (7 hari), Week 2 (14 hari), Week 3 (21 hari)
-    const maxDays = parseInt(weekNum) * 7;
-
-    // Jika hari ini lebih besar dari batas akhir minggu tersebut -> TOLAK UPLOAD
-    if (diffDays > maxDays) {
-       return reply.code(400).send({ message: `Maaf, waktu pelaporan Minggu ${weekNum} sudah berakhir.` });
-    }
-
-    // 2. PROSES UPLOAD
+async function tanggungJawabRoutes(fastify, options) {
+  
+  // POST: Upload Laporan (3 Foto untuk Minggu Tertentu)
+  fastify.post('/', {
+    onRequest: [async (request) => await request.jwtVerify()]
+  }, async (request, reply) => {
     const parts = request.parts();
-    let updateData = {};
     
-    const folderName = 'img-tanggungjawab';
-    const uploadDir = path.join(process.cwd(), 'uploads', folderName);
-    if (!fs.existsSync(uploadDir)){
-        fs.mkdirSync(uploadDir, { recursive: true });
+    let cat_id, week;
+    let img_makanan, img_aktivitas, img_kotoran;
+
+    // 1. Proses Upload File & Field
+    for await (const part of parts) {
+      if (part.file) {
+        const timestamp = Date.now();
+        const ext = path.extname(part.filename);
+        // Nama file: tj-{catId}-{jenis}-{timestamp}
+        const filename = `tj-${part.fieldname}-${timestamp}${ext}`;
+        
+        // Pastikan folder upload ada (Opsional, tapi aman)
+        const uploadDir = path.join(__dirname, '../../uploads/img-tanggungjawab');
+        if (!fs.existsSync(uploadDir)){
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        const savePath = path.join(uploadDir, filename);
+        
+        await pump(part.file, fs.createWriteStream(savePath));
+
+        if (part.fieldname === 'bukti_makanan') img_makanan = filename;
+        if (part.fieldname === 'bukti_aktivitas') img_aktivitas = filename;
+        if (part.fieldname === 'bukti_kotoran') img_kotoran = filename;
+
+      } else {
+        if (part.fieldname === 'cat_id') cat_id = parseInt(part.value);
+        if (part.fieldname === 'week') week = parseInt(part.value);
+      }
+    }
+
+    if (!cat_id || !week) {
+        return reply.code(400).send({ message: 'Data tidak lengkap (cat_id/week)' });
+    }
+
+    // 2. Tentukan Kolom Database Mana yang Diupdate Berdasarkan Minggu
+    let updateData = {};
+    if (week === 1) {
+        updateData = { 
+            gambarmakanan1: img_makanan, 
+            gambaraktivitas1: img_aktivitas, 
+            gambarkotoran1: img_kotoran 
+        };
+    } else if (week === 2) {
+        updateData = { 
+            gambarmakanan2: img_makanan, 
+            gambaraktivitas2: img_aktivitas, 
+            gambarkotoran2: img_kotoran 
+        };
+    } else if (week === 3) {
+        updateData = { 
+            gambarmakanan3: img_makanan, 
+            gambaraktivitas3: img_aktivitas, 
+            gambarkotoran3: img_kotoran 
+        };
     }
 
     try {
-      for await (const part of parts) {
-        if (part.file) {
-          // Deteksi ekstensi file
-          let ext = path.extname(part.filename);
-          if (!ext || ext === '') {
-            if (part.mimetype === 'image/jpeg') ext = '.jpg';
-            else if (part.mimetype === 'image/png') ext = '.png';
-            else if (part.mimetype === 'image/webp') ext = '.webp';
-            else ext = '.jpg';
-          }
-
-          const filename = `tj-${catId}-w${weekNum}-${part.fieldname}-${Date.now()}${ext}`;
-          const savePath = path.join(uploadDir, filename);
-          
-          // ✅ FIX: Gunakan pipeline langsung (bukan pump)
-          await pipeline(part.file, fs.createWriteStream(savePath));
-
-          // Simpan path untuk database
-          const dbColumn = `gambar${part.fieldname}${weekNum}`; 
-          updateData[dbColumn] = `/uploads/${folderName}/${filename}`;
-        }
-      }
-
-      // 3. SIMPAN KE DATABASE
-      const existing = await prisma.tanggungjawab.findFirst({
-          where: { id_cat: parseInt(catId) }
+      // 3. Cek Apakah Data Sudah Ada untuk Kucing Ini
+      const existingReport = await fastify.prisma.tanggungjawab.findFirst({
+        where: { id_cat: cat_id }
       });
 
-      if (existing) {
-          await prisma.tanggungjawab.update({
-              where: { id: existing.id },
-              data: updateData
-          });
+      let laporan;
+      if (existingReport) {
+        // UPDATE: Jika sudah ada (misal minggu lalu sudah isi), update kolom minggu ini
+        laporan = await fastify.prisma.tanggungjawab.update({
+          where: { id: existingReport.id },
+          data: updateData
+        });
       } else {
-          await prisma.tanggungjawab.create({
-              data: {
-                  id_cat: parseInt(catId),
-                  ...updateData
-              }
-          });
+        // CREATE: Jika belum ada sama sekali, buat baru dengan data minggu ini
+        laporan = await fastify.prisma.tanggungjawab.create({
+          data: {
+            id_cat: cat_id,
+            ...updateData
+          }
+        });
       }
 
-      return { status: 'success', message: `Laporan Minggu ${weekNum} berhasil disimpan` };
+      return { message: `Laporan Minggu ${week} berhasil disimpan`, data: laporan };
 
     } catch (error) {
-      console.error("Error Upload:", error);
-      return reply.code(500).send({ message: 'Gagal menyimpan laporan', error: error.message });
+      console.error(error);
+      return reply.code(500).send({ message: 'Gagal menyimpan laporan' });
+    }
+  });
+
+  // GET: Ambil Data Laporan Kucing Tertentu
+  fastify.get('/:catId', async (request, reply) => {
+    const { catId } = request.params;
+    try {
+      const report = await fastify.prisma.tanggungjawab.findFirst({
+        where: { id_cat: parseInt(catId) }
+      });
+      return report || {}; // Kembalikan object kosong jika belum ada
+    } catch (error) {
+      return reply.code(500).send({ message: 'Error mengambil data' });
     }
   });
 }
 
-export default tanggungjawabRoutes;
+// GUNAKAN EXPORT DEFAULT UNTUK ESM
+export default tanggungJawabRoutes;
