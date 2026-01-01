@@ -3,11 +3,13 @@ import path from 'path';
 import util from 'util';
 import { pipeline } from 'stream';
 import { fileURLToPath } from 'url';
+import { PrismaClient } from '@prisma/client'; // <--- TAMBAHAN PENTING
 
-// Setup __dirname untuk ES Modules
+// Setup
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const pump = util.promisify(pipeline);
+const prisma = new PrismaClient(); // <--- INISIALISASI PRISMA
 
 async function tanggungJawabRoutes(fastify, options) {
   
@@ -25,10 +27,10 @@ async function tanggungJawabRoutes(fastify, options) {
       if (part.file) {
         const timestamp = Date.now();
         const ext = path.extname(part.filename);
-        // Nama file: tj-{catId}-{jenis}-{timestamp}
+        // Nama file: tj-{fieldname}-{timestamp}.ext
         const filename = `tj-${part.fieldname}-${timestamp}${ext}`;
         
-        // Pastikan folder upload ada (Opsional, tapi aman)
+        // Pastikan folder upload ada
         const uploadDir = path.join(__dirname, '../../uploads/img-tanggungjawab');
         if (!fs.existsSync(uploadDir)){
             fs.mkdirSync(uploadDir, { recursive: true });
@@ -76,20 +78,21 @@ async function tanggungJawabRoutes(fastify, options) {
 
     try {
       // 3. Cek Apakah Data Sudah Ada untuk Kucing Ini
-      const existingReport = await fastify.prisma.tanggungjawab.findFirst({
+      // GUNAKAN 'prisma' (bukan fastify.prisma)
+      const existingReport = await prisma.tanggungjawab.findFirst({
         where: { id_cat: cat_id }
       });
 
       let laporan;
       if (existingReport) {
         // UPDATE: Jika sudah ada (misal minggu lalu sudah isi), update kolom minggu ini
-        laporan = await fastify.prisma.tanggungjawab.update({
+        laporan = await prisma.tanggungjawab.update({
           where: { id: existingReport.id },
           data: updateData
         });
       } else {
-        // CREATE: Jika belum ada sama sekali, buat baru dengan data minggu ini
-        laporan = await fastify.prisma.tanggungjawab.create({
+        // CREATE: Jika belum ada sama sekali, buat baru
+        laporan = await prisma.tanggungjawab.create({
           data: {
             id_cat: cat_id,
             ...updateData
@@ -100,8 +103,8 @@ async function tanggungJawabRoutes(fastify, options) {
       return { message: `Laporan Minggu ${week} berhasil disimpan`, data: laporan };
 
     } catch (error) {
-      console.error(error);
-      return reply.code(500).send({ message: 'Gagal menyimpan laporan' });
+      console.error("Error Saving Report:", error);
+      return reply.code(500).send({ message: 'Gagal menyimpan laporan', error: error.message });
     }
   });
 
@@ -109,15 +112,15 @@ async function tanggungJawabRoutes(fastify, options) {
   fastify.get('/:catId', async (request, reply) => {
     const { catId } = request.params;
     try {
-      const report = await fastify.prisma.tanggungjawab.findFirst({
+      const report = await prisma.tanggungjawab.findFirst({
         where: { id_cat: parseInt(catId) }
       });
       return report || {}; // Kembalikan object kosong jika belum ada
     } catch (error) {
+      console.error(error);
       return reply.code(500).send({ message: 'Error mengambil data' });
     }
   });
 }
 
-// GUNAKAN EXPORT DEFAULT UNTUK ESM
 export default tanggungJawabRoutes;

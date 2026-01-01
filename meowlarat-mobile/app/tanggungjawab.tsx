@@ -9,45 +9,51 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../constants/Colors';
 
-// GANTI SESUAI IP KAMU
 const API_URL = 'http://192.168.18.12:3000'; 
 
 export default function TanggungJawabScreen() {
   const router = useRouter();
-  // Menerima data dari halaman sebelumnya
   const { catId, catName, adoptDate } = useLocalSearchParams(); 
 
-  // State
-  const [week, setWeek] = useState(''); // Minggu yang dipilih di dropdown
-  const [currentActiveWeek, setCurrentActiveWeek] = useState(0); // Minggu yang seharusnya aktif saat ini
+  const [week, setWeek] = useState(''); 
+  const [currentActiveWeek, setCurrentActiveWeek] = useState(0); 
+  const [daysPassed, setDaysPassed] = useState(0); 
   const [loading, setLoading] = useState(false);
   const [dropdownVisible, setDropdownVisible] = useState(false);
 
-  // State Foto (3 Jenis)
+  // State 3 Foto
   const [imgMakanan, setImgMakanan] = useState<string | null>(null);
   const [imgAktivitas, setImgAktivitas] = useState<string | null>(null);
   const [imgKotoran, setImgKotoran] = useState<string | null>(null);
 
-  // --- 1. HITUNG MINGGU BERJALAN ---
+  // --- LOGIKA HITUNG HARI (DIPERBAIKI) ---
   useEffect(() => {
     if (adoptDate) {
       const start = new Date(adoptDate as string);
       const now = new Date();
+
+      // Debugging di Terminal
+      console.log("Start Date:", start);
+      console.log("Now:", now);
+
+      // Hitung selisih waktu dalam milidetik
+      const diffTime = now.getTime() - start.getTime();
       
-      // Hitung selisih waktu dalam hari
-      const diffTime = Math.abs(now.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      // Konversi ke Hari (Pembulatan ke atas agar 1 jam = Hari ke-1)
+      // Math.max(1, ...) memastikan minimal hari ke-1 (tidak negatif)
+      const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24))); 
+      
+      setDaysPassed(diffDays);
 
       let activeWeek = 0;
-      // Logika penentuan minggu (1 minggu = 7 hari)
       if (diffDays <= 7) activeWeek = 1;
       else if (diffDays <= 14) activeWeek = 2;
       else if (diffDays <= 21) activeWeek = 3;
-      else activeWeek = 4; // Minggu ke-4 berarti sudah selesai masa pantau
+      else activeWeek = 4; // Lewat 21 hari = Selesai
 
       setCurrentActiveWeek(activeWeek);
       
-      // Otomatis set minggu terpilih ke minggu aktif (jika belum selesai)
+      // Set dropdown otomatis ke minggu aktif
       if (activeWeek >= 1 && activeWeek <= 3) {
         setWeek(activeWeek.toString());
       } else {
@@ -56,13 +62,13 @@ export default function TanggungJawabScreen() {
     }
   }, [adoptDate]);
 
-  // --- 2. FUNGSI PILIH GAMBAR ---
+  // --- PILIH FOTO ---
   const pickImage = async (type: 'makanan' | 'aktivitas' | 'kotoran') => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.6, // Kompres sedikit
+      quality: 0.5, // Kompres biar ringan
     });
 
     if (!result.canceled) {
@@ -73,42 +79,30 @@ export default function TanggungJawabScreen() {
     }
   };
 
-  // --- 3. SUBMIT LAPORAN ---
+  // --- SUBMIT DATA ---
   const handleSubmit = async () => {
-    // Validasi Minggu
+    // Validasi Waktu
     if (currentActiveWeek > 3) {
-        return Alert.alert("Selesai", "Masa pemantauan 3 minggu sudah selesai. Terima kasih!");
+        return Alert.alert("Selesai", "Masa pemantauan sudah selesai.");
     }
-    // Validasi apakah user mencoba mengakali dropdown
     if (parseInt(week) !== currentActiveWeek) {
-        return Alert.alert("Salah Minggu", `Saat ini adalah Minggu ke-${currentActiveWeek}. Kamu hanya bisa laporan untuk minggu ini.`);
+        return Alert.alert("Salah Minggu", `Sekarang hari ke-${daysPassed}, masuk Minggu ke-${currentActiveWeek}. Kamu tidak bisa mengisi minggu lain.`);
     }
-
-    // Validasi Foto Lengkap
+    // Validasi Foto
     if (!imgMakanan || !imgAktivitas || !imgKotoran) {
-      return Alert.alert("Data Belum Lengkap", "Kamu wajib mengupload ketiga foto bukti (Makanan, Aktivitas, Kotoran).");
+      return Alert.alert("Data Kurang", "Wajib upload 3 foto bukti (Makanan, Aktivitas, Kotoran).");
     }
 
     setLoading(true);
     try {
       const session = await AsyncStorage.getItem('user_session');
-      if (!session) {
-        Alert.alert("Error", "Sesi habis, silakan login ulang.");
-        return;
-      }
-      
-      const parsedSession = JSON.parse(session);
-      const token = parsedSession.token; 
+      if (!session) { Alert.alert("Error", "Login ulang."); return; }
+      const token = JSON.parse(session).token; 
 
-      // Siapkan Form Data
       const formData = new FormData();
       formData.append('cat_id', catId as string);
       formData.append('week', week);
-      // 'aktivitas' teks dikosongkan/diisi default karena diganti foto, 
-      // tapi backend mungkin masih butuh field ini agar tidak error
-      formData.append('aktivitas', 'Laporan Mingguan'); 
 
-      // Helper Append File
       const appendFile = (uri: string, fieldName: string) => {
         const filename = uri.split('/').pop();
         const match = /\.(\w+)$/.exec(filename || '');
@@ -125,12 +119,12 @@ export default function TanggungJawabScreen() {
       appendFile(imgAktivitas, 'bukti_aktivitas');
       appendFile(imgKotoran, 'bukti_kotoran');
 
-      // Kirim ke Backend
+      // PERBAIKAN: Hapus Content-Type header manual
       const response = await fetch(`${API_URL}/api/tanggungjawab`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}` 
+          // JANGAN ADA 'Content-Type': 'multipart/form-data' DI SINI!
         },
         body: formData,
       });
@@ -138,10 +132,10 @@ export default function TanggungJawabScreen() {
       const result = await response.json();
 
       if (response.ok) {
-        Alert.alert("Berhasil", `Laporan Minggu ke-${week} berhasil dikirim!`);
+        Alert.alert("Berhasil", `Laporan Minggu ke-${week} diterima!`);
         router.back(); 
       } else {
-        Alert.alert("Gagal", result.message || "Gagal mengirim laporan.");
+        Alert.alert("Gagal", result.message || "Gagal kirim data.");
       }
     } catch (error) {
       console.error(error);
@@ -151,17 +145,7 @@ export default function TanggungJawabScreen() {
     }
   };
 
-  // Helper UI Dropdown
-  const getWeekStatus = (w: number) => {
-    if (w < currentActiveWeek) return "(Terlewat 🔒)";
-    if (w > currentActiveWeek) return "(Belum Mulai 🔒)";
-    if (w === currentActiveWeek) return "(Aktif ✅)";
-    return "";
-  };
-
-  const isWeekDisabled = (w: number) => {
-    return w !== currentActiveWeek;
-  };
+  const isWeekDisabled = (w: number) => w !== currentActiveWeek;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -176,24 +160,24 @@ export default function TanggungJawabScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.subHeader}>Kucing: <Text style={{fontWeight:'bold', color:Colors.primary}}>{catName}</Text></Text>
 
-        {/* --- INFO ALERT --- */}
+        {/* INFO BOX (DEBUGGING TERLIHAT DISINI) */}
         <View style={styles.infoBox}>
-            <Ionicons name="information-circle" size={20} color="#155724" />
+            <Ionicons name="calendar" size={20} color="#004085" />
             <Text style={styles.infoBoxText}>
-                Status: <Text style={{fontWeight:'bold'}}>Minggu ke-{currentActiveWeek > 3 ? 'Selesai' : currentActiveWeek}</Text> sejak adopsi.
+                Hari ke-<Text style={{fontWeight:'bold', fontSize:14}}>{daysPassed}</Text> pasca adopsi.{'\n'}
+                Status: <Text style={{fontWeight:'bold'}}>Minggu ke-{currentActiveWeek > 3 ? 'Selesai' : currentActiveWeek}</Text>
             </Text>
         </View>
 
-        {/* --- DROPDOWN MINGGU --- */}
-        <Text style={styles.label}>Pilih Minggu Laporan</Text>
+        <Text style={styles.label}>Pilih Minggu</Text>
         <TouchableOpacity style={styles.dropdownBtn} onPress={() => setDropdownVisible(true)}>
           <Text style={styles.dropdownText}>
-             {week && week !== 'Selesai' ? `Minggu ${week}` : week === 'Selesai' ? 'Masa Pantau Selesai' : 'Pilih Minggu...'}
+             {week && week !== 'Selesai' ? `Minggu ${week}` : week === 'Selesai' ? 'Selesai' : 'Pilih...'}
           </Text>
           <Ionicons name="chevron-down" size={20} color="#666" />
         </TouchableOpacity>
 
-        {/* Modal Pilihan Minggu */}
+        {/* Modal Dropdown */}
         <Modal visible={dropdownVisible} transparent animationType="fade">
           <TouchableOpacity style={styles.modalOverlay} onPress={() => setDropdownVisible(false)}>
             <View style={styles.modalContent}>
@@ -201,31 +185,25 @@ export default function TanggungJawabScreen() {
               {['1', '2', '3'].map((item) => {
                 const wNum = parseInt(item);
                 const disabled = isWeekDisabled(wNum);
-                
+                let statusText = "";
+                if (wNum < currentActiveWeek) statusText = "❌ Terlewat";
+                else if (wNum > currentActiveWeek) statusText = "🔒 Belum Mulai";
+                else statusText = "✅ Aktif";
+
                 return (
                   <TouchableOpacity 
                     key={item} 
                     style={[styles.modalItem, disabled && styles.modalItemDisabled]} 
                     onPress={() => { 
-                        if (disabled) {
-                            if (wNum < currentActiveWeek) Alert.alert("Terlewat", "Minggu ini sudah lewat.");
-                            else Alert.alert("Belum Waktunya", "Kamu belum bisa mengisi laporan ini.");
-                        } else {
-                            setWeek(item); 
-                            setDropdownVisible(false); 
-                        }
+                        if (!disabled) { setWeek(item); setDropdownVisible(false); }
+                        else { Alert.alert("Terkunci", `Minggu ini ${statusText}`); }
                     }}
                   >
                     <View>
-                        <Text style={[styles.modalItemText, disabled && {color:'#aaa'}]}>
-                            Minggu {item}
-                        </Text>
-                        <Text style={{fontSize:10, color: disabled ? '#ccc' : Colors.primary}}>
-                            {getWeekStatus(wNum)}
-                        </Text>
+                        <Text style={[styles.modalItemText, disabled && {color:'#aaa'}]}>Minggu {item}</Text>
+                        <Text style={{fontSize:10, color: disabled ? '#888' : Colors.primary}}>{statusText}</Text>
                     </View>
                     {week === item && <Ionicons name="checkmark" size={20} color={Colors.primary} />}
-                    {disabled && <Ionicons name="lock-closed" size={16} color="#ccc" />}
                   </TouchableOpacity>
                 );
               })}
@@ -233,29 +211,22 @@ export default function TanggungJawabScreen() {
           </TouchableOpacity>
         </Modal>
 
-        {/* --- KONDISI SELESAI ATAU FORM --- */}
         {currentActiveWeek > 3 ? (
             <View style={styles.finishedBox}>
-                <Ionicons name="trophy" size={50} color="#FFD700" />
-                <Text style={styles.finishedText}>Selamat! Kamu telah menyelesaikan 3 minggu masa pemantauan.</Text>
-                <Text style={styles.finishedSub}>Terima kasih sudah menjadi pemilik yang bertanggung jawab.</Text>
+                <Ionicons name="medal" size={60} color="#FFD700" />
+                <Text style={styles.finishedText}>Selesai!</Text>
+                <Text style={styles.finishedSub}>Terima kasih sudah merawatnya.</Text>
             </View>
         ) : (
             <>
-                <Text style={styles.sectionTitle}>Bukti Foto Mingguan (Wajib 3)</Text>
-
+                <Text style={styles.sectionTitle}>Upload 3 Bukti Foto</Text>
+                
                 {/* 1. Makanan */}
                 <View style={styles.uploadCard}>
                   <Text style={styles.uploadLabel}>1. Bukti Makanan 🍗</Text>
                   <TouchableOpacity style={styles.imagePicker} onPress={() => pickImage('makanan')}>
-                    {imgMakanan ? (
-                      <Image source={{ uri: imgMakanan }} style={styles.previewImage} />
-                    ) : (
-                      <View style={styles.placeholder}>
-                        <Ionicons name="camera-outline" size={32} color="#ccc" />
-                        <Text style={styles.placeholderText}>Foto Makanan</Text>
-                      </View>
-                    )}
+                    {imgMakanan ? <Image source={{ uri: imgMakanan }} style={styles.previewImage} /> : 
+                    <View style={styles.placeholder}><Ionicons name="camera-outline" size={30} color="#ccc"/><Text style={styles.placeholderText}>Foto Makanan</Text></View>}
                   </TouchableOpacity>
                 </View>
 
@@ -263,14 +234,8 @@ export default function TanggungJawabScreen() {
                 <View style={styles.uploadCard}>
                   <Text style={styles.uploadLabel}>2. Bukti Aktivitas 🧶</Text>
                   <TouchableOpacity style={styles.imagePicker} onPress={() => pickImage('aktivitas')}>
-                    {imgAktivitas ? (
-                      <Image source={{ uri: imgAktivitas }} style={styles.previewImage} />
-                    ) : (
-                      <View style={styles.placeholder}>
-                        <Ionicons name="camera-outline" size={32} color="#ccc" />
-                        <Text style={styles.placeholderText}>Foto Bermain/Tidur</Text>
-                      </View>
-                    )}
+                    {imgAktivitas ? <Image source={{ uri: imgAktivitas }} style={styles.previewImage} /> : 
+                    <View style={styles.placeholder}><Ionicons name="camera-outline" size={30} color="#ccc"/><Text style={styles.placeholderText}>Foto Aktivitas</Text></View>}
                   </TouchableOpacity>
                 </View>
 
@@ -278,28 +243,16 @@ export default function TanggungJawabScreen() {
                 <View style={styles.uploadCard}>
                   <Text style={styles.uploadLabel}>3. Bukti Kebersihan 💩</Text>
                   <TouchableOpacity style={styles.imagePicker} onPress={() => pickImage('kotoran')}>
-                    {imgKotoran ? (
-                      <Image source={{ uri: imgKotoran }} style={styles.previewImage} />
-                    ) : (
-                      <View style={styles.placeholder}>
-                        <Ionicons name="camera-outline" size={32} color="#ccc" />
-                        <Text style={styles.placeholderText}>Foto Litter Box</Text>
-                      </View>
-                    )}
+                    {imgKotoran ? <Image source={{ uri: imgKotoran }} style={styles.previewImage} /> : 
+                    <View style={styles.placeholder}><Ionicons name="camera-outline" size={30} color="#ccc"/><Text style={styles.placeholderText}>Foto Litter Box</Text></View>}
                   </TouchableOpacity>
                 </View>
 
-                {/* Tombol Kirim */}
                 <TouchableOpacity style={styles.btnSubmit} onPress={handleSubmit} disabled={loading}>
-                  {loading ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.btnText}>Kirim Laporan Minggu {week}</Text>
-                  )}
+                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Kirim Laporan</Text>}
                 </TouchableOpacity>
             </>
         )}
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -311,24 +264,17 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: 'bold' },
   content: { padding: 20 },
   subHeader: { fontSize: 16, marginBottom: 15, textAlign: 'center', color: '#555' },
-  
-  // Info Box
-  infoBox: { flexDirection:'row', backgroundColor:'#d4edda', padding:10, borderRadius:8, alignItems:'center', marginBottom:20 },
-  infoBoxText: { color:'#155724', marginLeft:8, flex:1, fontSize:13 },
-
+  infoBox: { flexDirection:'row', backgroundColor:'#cce5ff', padding:12, borderRadius:8, alignItems:'center', marginBottom:20, borderColor:'#b8daff', borderWidth:1 },
+  infoBoxText: { color:'#004085', marginLeft:10, flex:1, fontSize:13 },
   label: { fontSize: 14, fontWeight: 'bold', color: '#444', marginBottom: 8 },
-  
-  // Dropdown
   dropdownBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 15, backgroundColor: '#fafafa', marginBottom: 20 },
   dropdownText: { fontSize: 16, color: '#333' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '80%', backgroundColor: '#fff', borderRadius: 12, padding: 15, elevation: 5 },
+  modalContent: { width: '85%', backgroundColor: '#fff', borderRadius: 12, padding: 20, elevation: 5 },
   modalTitle: { fontSize: 18, fontWeight:'bold', marginBottom:15, textAlign:'center' },
-  modalItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, borderBottomWidth: 1, borderBottomColor: '#eee', alignItems:'center' },
+  modalItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', alignItems:'center' },
   modalItemDisabled: { backgroundColor: '#f9f9f9' },
   modalItemText: { fontSize: 16, color: '#333' },
-
-  // Upload
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.primary, marginTop: 10, marginBottom: 15, textDecorationLine: 'underline' },
   uploadCard: { marginBottom: 20 },
   uploadLabel: { fontSize: 14, marginBottom: 8, color: '#333', fontWeight: '500' },
@@ -336,11 +282,9 @@ const styles = StyleSheet.create({
   placeholder: { alignItems: 'center' },
   placeholderText: { color: '#999', marginTop: 5, fontSize: 12 },
   previewImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-
-  // Button & Finished State
   btnSubmit: { backgroundColor: Colors.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10, marginBottom: 50 },
   btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   finishedBox: { alignItems: 'center', marginTop: 50, padding: 20 },
-  finishedText: { fontSize: 18, fontWeight: 'bold', color: '#333', marginTop: 15, textAlign: 'center' },
-  finishedSub: { fontSize: 14, color: '#666', marginTop: 5, textAlign: 'center' }
+  finishedText: { fontSize: 20, fontWeight: 'bold', color: '#333', marginTop: 15, textAlign: 'center' },
+  finishedSub: { fontSize: 14, color: '#666', marginTop: 10, textAlign: 'center' }
 });

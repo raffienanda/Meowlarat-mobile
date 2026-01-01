@@ -97,6 +97,7 @@ export default function TabLayout() {
       <Tabs.Screen name="artikel" options={{ href: null }} />
       <Tabs.Screen name="petplace" options={{ href: null }} />
       <Tabs.Screen name="donasi" options={{ href: null }} />
+      <Tabs.Screen name="tanggungjawab" options={{ href: null }} />
     </Tabs>
   );
 }

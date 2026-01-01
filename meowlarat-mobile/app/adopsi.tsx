@@ -9,27 +9,38 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 import { cat } from '../types';
 
+// GANTI IP SESUAI CONFIG KAMU
 const API_URL = 'http://192.168.18.12:3000';  
 
 export default function AdopsiScreen() {
   const router = useRouter();
   
+  // State Data
   const [cats, setCats] = useState<cat[]>([]); 
   const [myAdoptions, setMyAdoptions] = useState<cat[]>([]); 
   const [historyCats, setHistoryCats] = useState<cat[]>([]); 
   
+  // State UI
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'available' | 'status' | 'history'>('available');
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedCat, setSelectedCat] = useState<cat | null>(null);
+  
+  // State User
   const [userSession, setUserSession] = useState<any>(null);
 
-  useEffect(() => { checkSession(); }, []);
+  useEffect(() => {
+    checkSession();
+  }, []);
 
   useEffect(() => {
-    if (activeTab === 'available') fetchCats();
-    else if (activeTab === 'status') fetchMyAdoptions();
-    else if (activeTab === 'history') fetchHistory();
+    if (activeTab === 'available') {
+      fetchCats();
+    } else if (activeTab === 'status') {
+      fetchMyAdoptions();
+    } else if (activeTab === 'history') {
+      fetchHistory();
+    }
   }, [activeTab, userSession]);
 
   const checkSession = async () => {
@@ -122,7 +133,8 @@ export default function AdopsiScreen() {
     } catch(e) { Alert.alert("Error", "Gagal koneksi server."); }
   };
 
-  // Renders
+  // --- RENDER ITEMS ---
+
   const renderAvailableItem = ({ item }: { item: cat }) => (
     <TouchableOpacity style={styles.card} onPress={() => { setSelectedCat(item); setModalVisible(true); }}>
       <Image source={{ uri: `${API_URL}/uploads/img-lapor/${item.img_url}` }} style={styles.cardImage} />
@@ -167,16 +179,23 @@ export default function AdopsiScreen() {
             <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
         </View>
         <Text style={styles.historyDetail}>{item.ras} • {item.gender}</Text>
+        <Text style={styles.historyDate}>
+            Diadopsi: {item.adoptdate ? new Date(item.adoptdate).toLocaleDateString('id-ID') : '-'}
+        </Text>
         <View style={styles.adoptedBadge}>
             <Text style={styles.adoptedText}>Sudah kamu ambil ✅</Text>
         </View>
         
-        {/* TOMBOL UPDATE TANGGUNG JAWAB */}
+        {/* === BAGIAN YANG DIPERBAIKI (Ditambahkan adoptDate) === */}
         <TouchableOpacity 
           style={styles.btnReport} 
           onPress={() => router.push({
             pathname: '/tanggungjawab',
-            params: { catId: item.id, catName: item.nama }
+            params: { 
+              catId: item.id, 
+              catName: item.nama,
+              adoptDate: item.adoptdate // <--- INI PENTING!
+            }
           })}
         >
           <Text style={styles.btnReportText}>Update Tanggung Jawab 📝</Text>
@@ -269,12 +288,10 @@ const styles = StyleSheet.create({
     tabTextActive: { color: Colors.primary },
     listContent: { padding: 10, paddingBottom: 50 },
     emptyText: { textAlign: 'center', marginTop: 20, color: '#888' },
-    
     card: { flex: 1, backgroundColor: '#fff', margin: 8, borderRadius: 16, overflow: 'hidden', elevation: 3, height: 220 },
     cardImage: { width: '100%', height: '100%' },
     cardOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', padding: 10 },
     cardTitle: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-
     statusCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, padding: 10, marginBottom: 12, elevation: 2, marginHorizontal: 5 },
     statusImage: { width: 90, height: 90, borderRadius: 10, marginRight: 12 },
     statusContent: { flex: 1, justifyContent: 'center' },
@@ -284,16 +301,16 @@ const styles = StyleSheet.create({
     btnTake: { backgroundColor: Colors.primary, padding: 8, borderRadius: 6, alignItems: 'center' },
     btnTakeText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
     waitText: { fontSize: 11, color: '#888', fontStyle: 'italic' },
-
     historyCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, padding: 10, marginBottom: 12, elevation: 2, marginHorizontal: 5, borderLeftWidth: 4, borderLeftColor: Colors.primary },
     historyImage: { width: 80, height: 80, borderRadius: 10, marginRight: 12 },
     historyContent: { flex: 1, justifyContent: 'center' },
     historyName: { fontSize: 16, fontWeight: 'bold', color: '#333' },
     historyDetail: { fontSize: 12, color: '#666', marginBottom: 4 },
+    historyDate: { fontSize: 11, color: '#888', fontStyle: 'italic', marginBottom: 6 },
     adoptedBadge: { backgroundColor: '#e3f2fd', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
     adoptedText: { fontSize: 10, color: Colors.primary, fontWeight: 'bold' },
     
-    // NEW BUTTON STYLE
+    // BUTTON STYLE
     btnReport: { marginTop: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: Colors.primary, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, alignItems: 'center', alignSelf: 'flex-start' },
     btnReportText: { fontSize: 11, color: Colors.primary, fontWeight: 'bold' },
 
