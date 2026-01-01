@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  StyleSheet, View, Text, TextInput, TouchableOpacity, 
+  StyleSheet, View, Text, TouchableOpacity, 
   Image, Alert, ScrollView, ActivityIndicator, SafeAreaView, Platform, Modal 
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -9,11 +9,17 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../constants/Colors';
 
+// Pastikan IP ini sesuai dengan IP laptop kamu (jika pakai emulator/device fisik via WiFi)
 const API_URL = 'http://192.168.18.12:3000'; 
 
 export default function TanggungJawabScreen() {
   const router = useRouter();
-  const { catId, catName, adoptDate } = useLocalSearchParams(); 
+  const params = useLocalSearchParams();
+  
+  // Ambil params dengan aman (handle jika array)
+  const catId = Array.isArray(params.catId) ? params.catId[0] : params.catId;
+  const catName = params.catName;
+  const adoptDate = params.adoptDate;
 
   const [week, setWeek] = useState(''); 
   const [currentActiveWeek, setCurrentActiveWeek] = useState(0); 
@@ -26,21 +32,14 @@ export default function TanggungJawabScreen() {
   const [imgAktivitas, setImgAktivitas] = useState<string | null>(null);
   const [imgKotoran, setImgKotoran] = useState<string | null>(null);
 
-  // --- LOGIKA HITUNG HARI (DIPERBAIKI) ---
+  // --- LOGIKA HITUNG HARI ---
   useEffect(() => {
     if (adoptDate) {
       const start = new Date(adoptDate as string);
       const now = new Date();
 
-      // Debugging di Terminal
-      console.log("Start Date:", start);
-      console.log("Now:", now);
-
-      // Hitung selisih waktu dalam milidetik
       const diffTime = now.getTime() - start.getTime();
-      
-      // Konversi ke Hari (Pembulatan ke atas agar 1 jam = Hari ke-1)
-      // Math.max(1, ...) memastikan minimal hari ke-1 (tidak negatif)
+      // Math.max(1, ...) memastikan minimal hari ke-1
       const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24))); 
       
       setDaysPassed(diffDays);
@@ -53,7 +52,7 @@ export default function TanggungJawabScreen() {
 
       setCurrentActiveWeek(activeWeek);
       
-      // Set dropdown otomatis ke minggu aktif
+      // Set dropdown otomatis ke minggu aktif jika valid (1-3)
       if (activeWeek >= 1 && activeWeek <= 3) {
         setWeek(activeWeek.toString());
       } else {
@@ -68,7 +67,7 @@ export default function TanggungJawabScreen() {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.5, // Kompres biar ringan
+      quality: 0.5, // Kompres biar ringan uploadnya
     });
 
     if (!result.canceled) {
@@ -79,16 +78,16 @@ export default function TanggungJawabScreen() {
     }
   };
 
-  // --- SUBMIT DATA ---
+  // --- SUBMIT DATA (DIPERBAIKI) ---
   const handleSubmit = async () => {
-    // Validasi Waktu
+    // 1. Validasi Input
     if (currentActiveWeek > 3) {
         return Alert.alert("Selesai", "Masa pemantauan sudah selesai.");
     }
-    if (parseInt(week) !== currentActiveWeek) {
-        return Alert.alert("Salah Minggu", `Sekarang hari ke-${daysPassed}, masuk Minggu ke-${currentActiveWeek}. Kamu tidak bisa mengisi minggu lain.`);
+    // Pastikan week punya nilai
+    if (!week || (week !== 'Selesai' && parseInt(week) !== currentActiveWeek)) {
+        return Alert.alert("Salah Minggu", `Sekarang hari ke-${daysPassed} (Minggu ke-${currentActiveWeek}). Pastikan pilih minggu yang sesuai.`);
     }
-    // Validasi Foto
     if (!imgMakanan || !imgAktivitas || !imgKotoran) {
       return Alert.alert("Data Kurang", "Wajib upload 3 foto bukti (Makanan, Aktivitas, Kotoran).");
     }
@@ -96,21 +95,45 @@ export default function TanggungJawabScreen() {
     setLoading(true);
     try {
       const session = await AsyncStorage.getItem('user_session');
-      if (!session) { Alert.alert("Error", "Login ulang."); return; }
-      const token = JSON.parse(session).token; 
+      if (!session) { 
+        Alert.alert("Error", "Sesi habis, silakan login ulang."); 
+        setLoading(false);
+        return; 
+      }
 
+      // --- CLEANING TOKEN ---
+      const parsedSession = JSON.parse(session);
+      let token = parsedSession.token;
+
+      if (!token) {
+        Alert.alert("Error", "Token hilang. Silakan Login ulang.");
+        return;
+      }
+      
+      // Hapus tanda kutip jika ada (misal "ey..." jadi ey...)
+      if (token.startsWith('"') && token.endsWith('"')) {
+        token = token.slice(1, -1);
+      }
+
+      console.log("Token Clean:", token);
+
+      // 2. Siapkan FormData
       const formData = new FormData();
-      formData.append('cat_id', catId as string);
-      formData.append('week', week);
+      
+      // PENTING: Append text sebagai string
+      formData.append('cat_id', String(catId));
+      formData.append('week', String(week));
 
+      // Fungsi helper append file
       const appendFile = (uri: string, fieldName: string) => {
         const filename = uri.split('/').pop();
         const match = /\.(\w+)$/.exec(filename || '');
         const type = match ? `image/${match[1]}` : `image/jpeg`;
-        // @ts-ignore
+        
+        // @ts-ignore (React Native FormData specific)
         formData.append(fieldName, { 
           uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''), 
-          name: filename, 
+          name: filename || `upload-${Date.now()}.jpg`, 
           type 
         });
       };
@@ -119,12 +142,12 @@ export default function TanggungJawabScreen() {
       appendFile(imgAktivitas, 'bukti_aktivitas');
       appendFile(imgKotoran, 'bukti_kotoran');
 
-      // PERBAIKAN: Hapus Content-Type header manual
+      // 3. Kirim ke Backend
       const response = await fetch(`${API_URL}/api/tanggungjawab`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}` 
-          // JANGAN ADA 'Content-Type': 'multipart/form-data' DI SINI!
+          // JANGAN cantumkan 'Content-Type': 'multipart/form-data' secara manual!
         },
         body: formData,
       });
@@ -132,14 +155,19 @@ export default function TanggungJawabScreen() {
       const result = await response.json();
 
       if (response.ok) {
-        Alert.alert("Berhasil", `Laporan Minggu ke-${week} diterima!`);
+        Alert.alert("Berhasil", `Laporan Minggu ke-${week} diterima! Terima kasih.`);
         router.back(); 
       } else {
-        Alert.alert("Gagal", result.message || "Gagal kirim data.");
+        console.log("Server Response:", result);
+        if (result.message && result.message.includes("token")) {
+           Alert.alert("Sesi Error", "Token tidak valid. Coba Logout dan Login lagi.");
+        } else {
+           Alert.alert("Gagal", result.message || "Gagal mengirim laporan.");
+        }
       }
     } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Gagal menghubungi server.");
+      console.error("Network Error:", error);
+      Alert.alert("Error", "Gagal menghubungi server. Periksa koneksi internet.");
     } finally {
       setLoading(false);
     }
@@ -160,7 +188,7 @@ export default function TanggungJawabScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.subHeader}>Kucing: <Text style={{fontWeight:'bold', color:Colors.primary}}>{catName}</Text></Text>
 
-        {/* INFO BOX (DEBUGGING TERLIHAT DISINI) */}
+        {/* INFO BOX */}
         <View style={styles.infoBox}>
             <Ionicons name="calendar" size={20} color="#004085" />
             <Text style={styles.infoBoxText}>
