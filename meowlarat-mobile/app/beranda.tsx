@@ -52,8 +52,8 @@ export default function BerandaScreen() {
           [
             { text: "Batal", style: "cancel" },
             { 
-              text: "Login Sekarang", 
-              onPress: () => router.replace('/') 
+              text: "Login", 
+              onPress: () => router.replace('/profil') 
             }
           ]
         );

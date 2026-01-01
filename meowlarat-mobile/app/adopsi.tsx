@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { 
   StyleSheet, View, Text, FlatList, Image, TouchableOpacity, 
   Modal, Alert, ActivityIndicator, SafeAreaView, RefreshControl, Platform 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage'; 
-import { useRouter } from 'expo-router'; 
+import { useRouter, useFocusEffect } from 'expo-router'; // Tambahkan useFocusEffect
 import { Ionicons } from '@expo/vector-icons'; 
 import { Colors } from '../constants/Colors';
 import { cat } from '../types';
@@ -29,9 +29,13 @@ export default function AdopsiScreen() {
   // State User
   const [userSession, setUserSession] = useState<any>(null);
 
-  useEffect(() => {
-    checkSession();
-  }, []);
+  // --- PERBAIKAN DI SINI (Ganti useEffect dengan useFocusEffect) ---
+  // Kode ini akan jalan setiap kali layar "Adopsi" dilihat/difokuskan
+  useFocusEffect(
+    useCallback(() => {
+      checkSession();
+    }, [])
+  );
 
   useEffect(() => {
     if (activeTab === 'available') {
@@ -49,6 +53,8 @@ export default function AdopsiScreen() {
       if (jsonValue != null) {
         const parsed = JSON.parse(jsonValue);
         setUserSession(parsed.user || parsed);
+      } else {
+        setUserSession(null); // Reset jika logout
       }
     } catch(e) { console.error("Gagal baca sesi"); }
   };
@@ -186,7 +192,6 @@ export default function AdopsiScreen() {
             <Text style={styles.adoptedText}>Sudah kamu ambil ✅</Text>
         </View>
         
-        {/* === BAGIAN YANG DIPERBAIKI (Ditambahkan adoptDate) === */}
         <TouchableOpacity 
           style={styles.btnReport} 
           onPress={() => router.push({
@@ -194,7 +199,7 @@ export default function AdopsiScreen() {
             params: { 
               catId: item.id, 
               catName: item.nama,
-              adoptDate: item.adoptdate // <--- INI PENTING!
+              adoptDate: item.adoptdate 
             }
           })}
         >
@@ -217,6 +222,7 @@ export default function AdopsiScreen() {
              key={tab}
              style={[styles.tabButton, activeTab === tab && styles.tabActive]} 
              onPress={() => {
+                // Logika ini sekarang akan membaca userSession yang sudah di-refresh oleh useFocusEffect
                 if (tab !== 'available' && !userSession) Alert.alert("Login", "Silakan login dulu.");
                 else setActiveTab(tab as any);
              }}
