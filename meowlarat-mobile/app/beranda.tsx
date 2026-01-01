@@ -82,7 +82,6 @@ export default function BerandaScreen() {
                 <MenuIcon icon="heart" label="Donasi" color="#ff6b6b" onPress={() => router.push('/donasi')} />
                 <MenuIcon icon="book" label="Artikel" color="#4ecdc4" onPress={() => router.push('/artikel')} />
                 <MenuIcon icon="map" label="Pet Place" color="#ffe66d" onPress={() => router.push('/petplace')} />
-                <MenuIcon icon="shield-checkmark" label="Tanggung Jawab" color="#1a535c" onPress={() => router.push('/lapor')} />
             </View>
         </View>
 
