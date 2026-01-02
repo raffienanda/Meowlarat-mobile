@@ -13,6 +13,7 @@ import { metode } from '../types';
 // ⚠️ GANTI IP SESUAI CONFIG KAMU
 const API_URL = 'http://192.168.18.12:3000'; 
 
+// Interface tambahan untuk data donasi di list bawah
 interface DonasiLog {
   id: number;
   username: string;
@@ -203,7 +204,7 @@ export default function DonasiScreen() {
             ) : (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.methodScroll}>
                     {metodes.map((m) => {
-                        const isActive = m.isActive; 
+                        const isActive = m.isActive !== false; // Default true if undefined
                         return (
                             <TouchableOpacity 
                                 key={m.id} 
@@ -242,20 +243,20 @@ export default function DonasiScreen() {
                 <View style={styles.rekInfo}>
                     <Text style={styles.rekTitle}>Silakan transfer ke:</Text>
                     
-                    {/* LOGIKA QRIS BESAR */}
+                    {/* --- LOGIKA TAMPILAN QRIS --- */}
                     {currentMetode.logo && currentMetode.category === 'E-Wallet' ? (
-                        <View style={styles.qrisContainer}>
-                            <Text style={styles.scanTextHeader}>SCAN QRIS</Text>
+                        <View style={styles.qrisWrapper}>
+                            <Text style={styles.scanTextHeader}>SCAN QRIS DI BAWAH</Text>
                             <Image 
                                 source={{ uri: `${API_URL}/uploads/logo/${currentMetode.logo}` }} 
                                 style={styles.qrisImage} 
                                 resizeMode="contain" 
                             />
-                            <Text style={styles.scanText}>Atas Nama: {currentMetode.an}</Text>
+                            <Text style={styles.scanText}>a.n {currentMetode.an}</Text>
                         </View>
                     ) : null}
 
-                    {/* LOGIKA LOGO BANK */}
+                    {/* --- LOGIKA TAMPILAN BANK (LOGO KECIL) --- */}
                     {currentMetode.logo && currentMetode.category !== 'E-Wallet' && (
                          <Image 
                             source={{ uri: `${API_URL}/uploads/logo/${currentMetode.logo}` }} 
@@ -294,7 +295,7 @@ export default function DonasiScreen() {
             </TouchableOpacity>
         </View>
 
-        {/* SECTION TRANSPARANSI */}
+        {/* --- SECTION TRANSPARANSI --- */}
         <View style={styles.transparencyContainer}>
             <View style={styles.totalCard}>
                 <Text style={styles.totalLabel}>Total Donasi Terkumpul</Text>
@@ -393,28 +394,25 @@ const styles = StyleSheet.create({
   rekNumber: { fontSize: 22, fontWeight: 'bold', color: '#856404', marginVertical: 5 },
   rekName: { fontSize: 14, color: '#856404' },
 
-  // --- STYLE BARU: QRIS FULL BLEED (Melebar ke samping) ---
-  qrisContainer: { 
-    alignItems: 'center', 
-    marginVertical: 15, 
-    backgroundColor: '#fff', 
-    paddingVertical: 20, 
-    
-    // TRICK: Margin negatif untuk melebar keluar dari padding parent (formContainer: 20)
-    marginHorizontal: -20, 
-    width: 'auto', 
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#eee'
+  // --- STYLE UNTUK QRIS (BESAR FULL WIDTH) ---
+  qrisWrapper: {
+    width: '100%',
+    alignItems: 'center',
+    marginVertical: 10,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 10,
+    // Negative margin ini yang membuat gambar bisa lebih lebar dari padding parent
+    marginHorizontal: -15, 
   },
   qrisImage: { 
-    width: 300, 
-    height: 300, 
-    backgroundColor: '#fff',
+    width: '100%', 
+    height: undefined, // Biarkan height menyesuaikan aspek rasio
+    aspectRatio: 1,    // Kotak
     marginBottom: 5 
   },
-  scanTextHeader: { fontSize: 16, fontWeight: 'bold', marginBottom: 10, color: '#333' },
-  scanText: { fontSize: 12, color: '#666', fontStyle: 'italic', marginTop: 5 },
+  scanTextHeader: { fontSize: 14, fontWeight: 'bold', marginBottom: 5, color: '#333' },
+  scanText: { fontSize: 12, color: '#666', fontStyle: 'italic' },
 
   bankLogo: { width: 100, height: 50, marginBottom: 5 },
 
