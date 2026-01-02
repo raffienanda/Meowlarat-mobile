@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, 
-  Image, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, RefreshControl, Dimensions 
+  Image, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, RefreshControl 
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -10,10 +10,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 import { metode } from '../types';
 
-// ⚠️ GANTI IP SESUAI CONFIG KAMU
+// ⚠️ PASTIKAN IP INI BENAR SESUAI CONFIG KAMU
 const API_URL = 'http://192.168.18.12:3000'; 
 
-// Interface tambahan untuk data donasi di list bawah
+// Interface untuk data history donasi (Tabel Transparansi)
 interface DonasiLog {
   id: number;
   username: string;
@@ -54,8 +54,7 @@ export default function DonasiScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchDonations(); 
-    await fetchMetode();
+    await fetchAllData(); 
     setRefreshing(false);
   }, []);
 
@@ -122,6 +121,7 @@ export default function DonasiScreen() {
       formData.append('metode', selectedMetode.toString()); 
       formData.append('username', userSession.username); 
 
+      // Proses file gambar
       const filename = image.split('/').pop();
       const match = /\.(\w+)$/.exec(filename || '');
       const type = match ? `image/${match[1]}` : `image`;
@@ -132,10 +132,11 @@ export default function DonasiScreen() {
         type,
       } as any); 
 
+      // --- PERBAIKAN VITAL: TANPA HEADER MANUAL ---
       const response = await fetch(`${API_URL}/api/donasi`, {
         method: 'POST',
         body: formData,
-        headers: { 'Content-Type': 'multipart/form-data' },
+        // Header Content-Type dihapus agar boundary otomatis terisi oleh sistem
       });
 
       const result = await response.json();
@@ -146,7 +147,7 @@ export default function DonasiScreen() {
         setPesan('');
         setImage(null);
         setSelectedMetode(null);
-        fetchDonations(); 
+        fetchDonations(); // Refresh data
       } else {
         Alert.alert("Gagal", result.message || "Terjadi kesalahan.");
       }
@@ -204,7 +205,7 @@ export default function DonasiScreen() {
             ) : (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.methodScroll}>
                     {metodes.map((m) => {
-                        const isActive = m.isActive !== false; // Default true if undefined
+                        const isActive = m.isActive !== false; 
                         return (
                             <TouchableOpacity 
                                 key={m.id} 
@@ -227,9 +228,10 @@ export default function DonasiScreen() {
                                     {m.nama}
                                 </Text>
                                 
+                                {/* Label Coming Soon */}
                                 {!isActive && (
                                     <View style={styles.comingSoonBadge}>
-                                        <Text style={styles.comingSoonText}>Coming Soon</Text>
+                                        <Text style={styles.comingSoonText}>Soon</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -243,8 +245,8 @@ export default function DonasiScreen() {
                 <View style={styles.rekInfo}>
                     <Text style={styles.rekTitle}>Silakan transfer ke:</Text>
                     
-                    {/* --- LOGIKA TAMPILAN QRIS --- */}
-                    {currentMetode.logo && currentMetode.category === 'E-Wallet' ? (
+                    {/* --- LOGIKA QRIS BESAR (E-Wallet) --- */}
+                    {currentMetode.logo && (currentMetode.category === 'E-Wallet' || currentMetode.nama.includes('QRIS')) ? (
                         <View style={styles.qrisWrapper}>
                             <Text style={styles.scanTextHeader}>SCAN QRIS DI BAWAH</Text>
                             <Image 
@@ -256,8 +258,8 @@ export default function DonasiScreen() {
                         </View>
                     ) : null}
 
-                    {/* --- LOGIKA TAMPILAN BANK (LOGO KECIL) --- */}
-                    {currentMetode.logo && currentMetode.category !== 'E-Wallet' && (
+                    {/* --- LOGIKA BANK (LOGO KECIL) --- */}
+                    {currentMetode.logo && currentMetode.category !== 'E-Wallet' && !currentMetode.nama.includes('QRIS') && (
                          <Image 
                             source={{ uri: `${API_URL}/uploads/logo/${currentMetode.logo}` }} 
                             style={styles.bankLogo} 
@@ -295,7 +297,7 @@ export default function DonasiScreen() {
             </TouchableOpacity>
         </View>
 
-        {/* --- SECTION TRANSPARANSI --- */}
+        {/* --- SECTION TRANSPARANSI DONASI --- */}
         <View style={styles.transparencyContainer}>
             <View style={styles.totalCard}>
                 <Text style={styles.totalLabel}>Total Donasi Terkumpul</Text>
@@ -372,11 +374,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden'    
   },
   methodCardActive: { backgroundColor: '#e3f2fd', borderColor: Colors.primary },
-  methodCardDisabled: { backgroundColor: '#f8f9fa', borderColor: '#f0f0f0', opacity: 0.8 },
+  methodCardDisabled: { backgroundColor: '#f8f9fa', borderColor: '#f0f0f0', opacity: 0.7 },
   
   methodText: { fontWeight: '600', color: '#666' },
   methodTextActive: { color: Colors.primary },
-  methodTextDisabled: { color: '#aaa' },
+  methodTextDisabled: { color: '#bbb' },
 
   comingSoonBadge: {
     position: 'absolute',
@@ -387,34 +389,37 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderBottomLeftRadius: 8,
   },
-  comingSoonText: { fontSize: 8, fontWeight: 'bold', color: '#fff' },
+  comingSoonText: { fontSize: 10, fontWeight: 'bold', color: '#fff' },
 
   rekInfo: { backgroundColor: '#fff3cd', padding: 15, borderRadius: 8, marginTop: 10, alignItems: 'center' },
   rekTitle: { fontSize: 12, color: '#856404' },
   rekNumber: { fontSize: 22, fontWeight: 'bold', color: '#856404', marginVertical: 5 },
   rekName: { fontSize: 14, color: '#856404' },
 
-  // --- STYLE UNTUK QRIS (BESAR FULL WIDTH) ---
+  // --- STYLE KHUSUS: QRIS FULL BLEED (Melebar ke samping) ---
   qrisWrapper: {
     width: '100%',
     alignItems: 'center',
-    marginVertical: 10,
+    marginVertical: 15,
     backgroundColor: '#fff',
     borderRadius: 10,
-    padding: 10,
-    // Negative margin ini yang membuat gambar bisa lebih lebar dari padding parent
-    marginHorizontal: -15, 
+    paddingVertical: 20,
+    // Trik Negative Margin agar gambar melebar menutupi padding container induk
+    marginHorizontal: -20, 
+    borderWidth: 1,
+    borderColor: '#eee',
+    elevation: 2
   },
   qrisImage: { 
-    width: '100%', 
-    height: undefined, // Biarkan height menyesuaikan aspek rasio
-    aspectRatio: 1,    // Kotak
-    marginBottom: 5 
+    width: 280, // Ukuran Besar Fixed
+    height: 280, 
+    marginBottom: 10,
+    backgroundColor: '#fff'
   },
-  scanTextHeader: { fontSize: 14, fontWeight: 'bold', marginBottom: 5, color: '#333' },
+  scanTextHeader: { fontSize: 14, fontWeight: 'bold', marginBottom: 10, color: '#333' },
   scanText: { fontSize: 12, color: '#666', fontStyle: 'italic' },
 
-  bankLogo: { width: 100, height: 50, marginBottom: 5 },
+  bankLogo: { width: 120, height: 60, marginBottom: 5 },
 
   uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f2f5', padding: 15, borderRadius: 8, borderWidth: 1, borderColor: '#ccc', borderStyle: 'dashed' },
   uploadText: { marginLeft: 10, color: '#666' },
