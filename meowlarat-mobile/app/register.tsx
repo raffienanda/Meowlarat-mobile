@@ -1,145 +1,219 @@
-// meowlarat-mobile/app/register.tsx
 import React, { useState } from 'react';
 import { 
-  StyleSheet, Text, View, TextInput, TouchableOpacity, 
-  Alert, ActivityIndicator, Image, ScrollView 
+  StyleSheet, View, Text, TextInput, TouchableOpacity, 
+  Image, Alert, ScrollView, SafeAreaView, ActivityIndicator, KeyboardAvoidingView, Platform 
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 
-// ⚠️ GANTI IP
-const API_URL = 'http://192.168.18.12:3000';
+// Pastikan IP Address ini sesuai dengan backend (laptop) kamu
+const API_URL = 'http://192.168.18.12:3000'; 
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const [form, setForm] = useState({
-    username: '',
-    email: '',
-    nama: '',
-    password: '',
-    phone: ''
-  });
+  
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [nama, setNama] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleRegister = async () => {
-    if (!form.username || !form.email || !form.password || !form.nama) {
-        return Alert.alert("Error", "Mohon lengkapi semua data wajib.");
+    // 1. Validasi Input Kosong
+    if (!username || !password || !email || !nama || !phone) {
+      Alert.alert("Data Tidak Lengkap", "Mohon isi semua kolom pendaftaran.");
+      return;
     }
 
     setLoading(true);
-    try {
-        const response = await fetch(`${API_URL}/api/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(form)
-        });
 
-        const result = await response.json();
-        
-        if (response.ok) {
-            Alert.alert("Sukses", "Pendaftaran berhasil! Silakan login.", [
-                { text: "Login", onPress: () => router.back() } // Kembali ke halaman Profil/Login
-            ]);
-        } else {
-            Alert.alert("Gagal", result.message || "Terjadi kesalahan.");
-        }
+    try {
+      // 2. Kirim Data ke Backend
+      const response = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          password,
+          email,
+          nama,
+          phone
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        Alert.alert("Berhasil", "Registrasi berhasil! Silakan login.", [
+          { text: "OK", onPress: () => router.replace('/') } // Kembali ke Login setelah sukses
+        ]);
+      } else {
+        Alert.alert("Gagal", result.message || "Terjadi kesalahan saat registrasi.");
+      }
     } catch (error) {
-        Alert.alert("Error", "Gagal menghubungi server.");
+      console.error("Register Error:", error);
+      Alert.alert("Error", "Gagal menghubungi server. Cek koneksi internet.");
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color={Colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Daftar Akun Baru</Text>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"} 
+        style={{ flex: 1 }}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          
+          {/* Header / Logo Area */}
+          <View style={styles.header}>
+            <Image 
+              source={require('../assets/images/logo.png')} // Pastikan logo ada
+              style={styles.logo}
+            />
+            <Text style={styles.title}>Daftar Akun</Text>
+            <Text style={styles.subtitle}>Bergabunglah dengan komunitas MeowLarat</Text>
+          </View>
 
-      <View style={styles.logoContainer}>
-        <Image source={require('../assets/images/logo.png')} style={styles.logo} />
-        <Text style={styles.subtitle}>Bergabunglah dengan komunitas MeowLarat</Text>
-      </View>
+          {/* Form Input */}
+          <View style={styles.form}>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Nama Lengkap</Text>
+              <TextInput 
+                style={styles.input} 
+                placeholder="Contoh: Raffie Ananda"
+                value={nama}
+                onChangeText={setNama}
+              />
+            </View>
 
-      <View style={styles.form}>
-        <Text style={styles.label}>Nama Lengkap*</Text>
-        <TextInput 
-            style={styles.input} 
-            placeholder="Contoh: Budi Santoso"
-            value={form.nama}
-            onChangeText={(t) => setForm({...form, nama: t})}
-        />
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Username</Text>
+              <TextInput 
+                style={styles.input} 
+                placeholder="Username unik"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+              />
+            </View>
 
-        <Text style={styles.label}>Username*</Text>
-        <TextInput 
-            style={styles.input} 
-            placeholder="username_unik"
-            autoCapitalize="none"
-            value={form.username}
-            onChangeText={(t) => setForm({...form, username: t})}
-        />
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput 
+                style={styles.input} 
+                placeholder="email@contoh.com"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
 
-        <Text style={styles.label}>Email*</Text>
-        <TextInput 
-            style={styles.input} 
-            placeholder="email@contoh.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            value={form.email}
-            onChangeText={(t) => setForm({...form, email: t})}
-        />
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>No. WhatsApp / HP</Text>
+              <TextInput 
+                style={styles.input} 
+                placeholder="08xxxxxxxx"
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+              />
+            </View>
 
-        <Text style={styles.label}>No. Telepon (Opsional)</Text>
-        <TextInput 
-            style={styles.input} 
-            placeholder="08123456789"
-            keyboardType="phone-pad"
-            value={form.phone}
-            onChangeText={(t) => setForm({...form, phone: t})}
-        />
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.passwordContainer}>
+                <TextInput 
+                  style={styles.inputPassword} 
+                  placeholder="********"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons name={showPassword ? "eye-off" : "eye"} size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+            </View>
 
-        <Text style={styles.label}>Password*</Text>
-        <TextInput 
-            style={styles.input} 
-            placeholder="********"
-            secureTextEntry
-            value={form.password}
-            onChangeText={(t) => setForm({...form, password: t})}
-        />
+            {/* Tombol Register */}
+            <TouchableOpacity 
+              style={styles.btnRegister} 
+              onPress={handleRegister}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.btnRegisterText}>Daftar Sekarang</Text>
+              )}
+            </TouchableOpacity>
 
-        <TouchableOpacity style={styles.btnRegister} onPress={handleRegister} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Daftar Sekarang</Text>}
-        </TouchableOpacity>
+            {/* --- FIX TOMBOL LOGIN DISINI --- */}
+            <View style={styles.loginContainer}>
+              <Text style={styles.loginText}>Sudah punya akun? </Text>
+              <TouchableOpacity onPress={() => router.replace('/profil')}>
+                <Text style={styles.loginLink}>Login disini</Text>
+              </TouchableOpacity>
+            </View>
 
-        <TouchableOpacity onPress={() => router.back()} style={styles.linkLogin}>
-            <Text style={styles.textLink}>Sudah punya akun? <Text style={{color: Colors.primary, fontWeight:'bold'}}>Login</Text></Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: 20, paddingTop: 50 },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  backBtn: { marginRight: 15 },
+  container: { flex: 1, backgroundColor: '#fff' },
+  scrollContent: { padding: 20, paddingBottom: 50 },
+  header: { alignItems: 'center', marginTop: 30, marginBottom: 30 },
+  logo: { width: 80, height: 80, resizeMode: 'contain', marginBottom: 15 },
   title: { fontSize: 24, fontWeight: 'bold', color: Colors.primary },
-  logoContainer: { alignItems: 'center', marginBottom: 30 },
-  logo: { width: 80, height: 80, resizeMode: 'contain', marginBottom: 10 },
-  subtitle: { color: Colors.gray },
-  form: { backgroundColor: Colors.white, padding: 20, borderRadius: 15, elevation: 3 },
-  label: { fontSize: 14, fontWeight: '600', marginBottom: 5, color: Colors.text },
+  subtitle: { fontSize: 14, color: '#666', marginTop: 5 },
+  form: { width: '100%' },
+  inputGroup: { marginBottom: 15 },
+  label: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 5 },
   input: { 
-    backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#eee', 
-    borderRadius: 10, padding: 12, marginBottom: 15, fontSize: 16 
+    backgroundColor: '#f9f9f9', 
+    borderWidth: 1, 
+    borderColor: '#ddd', 
+    borderRadius: 10, 
+    padding: 12, 
+    fontSize: 16 
   },
-  btnRegister: { backgroundColor: Colors.primary, padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 10 },
-  btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  linkLogin: { marginTop: 20, alignItems: 'center' },
-  textLink: { color: Colors.gray }
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+  },
+  inputPassword: { flex: 1, paddingVertical: 12, fontSize: 16 },
+  btnRegister: {
+    backgroundColor: Colors.primary,
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  btnRegisterText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  loginContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
+  loginText: { color: '#666', fontSize: 14 },
+  loginLink: { color: Colors.primary, fontWeight: 'bold', fontSize: 14 },
 });

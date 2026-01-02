@@ -15,9 +15,10 @@ async function forumRoutes(fastify, options) {
       const threads = await prisma.threads.findMany({
         where: whereClause,
         include: {
-          users: { select: { nama: true, img_url: true } }
+          users: { select: { nama: true, img_url: true } },
+          _count: { select: { posts: true } } // <--- TAMBAHAN PENTING: Hitung jumlah komentar
         },
-        orderBy: { id: 'desc' } // Urutkan dari yang terbaru
+        orderBy: { id: 'desc' } 
       });
       
       return threads;

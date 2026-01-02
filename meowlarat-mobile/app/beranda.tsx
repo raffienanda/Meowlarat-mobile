@@ -1,21 +1,22 @@
-// meowlarat-mobile/app/beranda.tsx
 import React, { useEffect, useState } from 'react';
 import { 
   StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, 
-  RefreshControl, Dimensions, ImageBackground 
+  RefreshControl, Dimensions, ImageBackground, Alert 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../constants/Colors';
 
-// ⚠️ GANTI DENGAN IP LAPTOP KAMU
+// ⚠️ PASTIKAN IP INI SESUAI DENGAN BACKEND KAMU
 const API_URL = 'http://192.168.18.12:3000';
 
 const { width } = Dimensions.get('window');
 
 export default function BerandaScreen() {
   const router = useRouter();
+  
   const [stats, setStats] = useState({ ready: 0, adopted: 0, shelters: 0 });
   const [refreshing, setRefreshing] = useState(false);
 
@@ -23,7 +24,10 @@ export default function BerandaScreen() {
     try {
       const response = await fetch(`${API_URL}/api/stats`);
       const data = await response.json();
-      setStats(data);
+      
+      if (data) {
+        setStats(data);
+      }
     } catch (error) {
       console.log('Gagal ambil stats:', error);
     }
@@ -35,6 +39,34 @@ export default function BerandaScreen() {
     setRefreshing(true);
     fetchStats().then(() => setRefreshing(false));
   }, []);
+
+  // --- FUNGSI CEK LOGIN ---
+  const handleProtectedPress = async (route: string) => {
+    try {
+      const session = await AsyncStorage.getItem('user_session');
+      
+      if (!session) {
+        Alert.alert(
+          "Akses Dibatasi",
+          "Silakan login terlebih dahulu untuk mengakses fitur ini.",
+          [
+            { text: "Batal", style: "cancel" },
+            { 
+              text: "Login", 
+              onPress: () => router.replace('/profil') 
+            }
+          ]
+        );
+        return;
+      }
+
+      router.push(route as any);
+
+    } catch (error) {
+      console.error("Error cek session:", error);
+      Alert.alert("Error", "Terjadi kesalahan sistem.");
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -51,7 +83,7 @@ export default function BerandaScreen() {
             </TouchableOpacity>
         </SafeAreaView>
 
-        {/* HERO SECTION - Mirip Web */}
+        {/* HERO SECTION */}
         <View style={styles.heroContainer}>
             <ImageBackground 
                 source={require('../assets/images/beranda-cat.png')} 
@@ -75,14 +107,43 @@ export default function BerandaScreen() {
             </ImageBackground>
         </View>
 
-        {/* MENU FITUR (Grid Bulat) */}
+        {/* MENU FITUR */}
         <View style={styles.menuContainer}>
             <Text style={styles.sectionTitle}>Layanan Kami</Text>
             <View style={styles.menuGrid}>
-                <MenuIcon icon="heart" label="Donasi" color="#ff6b6b" onPress={() => router.push('/donasi')} />
-                <MenuIcon icon="book" label="Artikel" color="#4ecdc4" onPress={() => router.push('/artikel')} />
-                <MenuIcon icon="map" label="Pet Place" color="#ffe66d" onPress={() => router.push('/petplace')} />
-                <MenuIcon icon="shield-checkmark" label="Tanggung Jawab" color="#1a535c" onPress={() => router.push('/lapor')} />
+                
+                {/* 1. Donasi (SEKARANG BUTUH LOGIN) */}
+                <MenuIcon 
+                  icon="heart" 
+                  label="Donasi" 
+                  color="#ff6b6b" 
+                  onPress={() => handleProtectedPress('/donasi')} 
+                />
+
+                {/* 2. Artikel (Bebas Akses) */}
+                <MenuIcon 
+                  icon="book" 
+                  label="Cat Pedia" 
+                  color="#4ecdc4" 
+                  onPress={() => router.push('/artikel')} 
+                />
+
+                {/* 3. Pet Place (Bebas Akses) */}
+                <MenuIcon 
+                  icon="map" 
+                  label="Pet Place" 
+                  color="#ffe66d" 
+                  onPress={() => router.push('/petplace')} 
+                />
+                
+                {/* 4. Riwayat (Butuh Login) */}
+                <MenuIcon 
+                  icon="time" 
+                  label="Riwayat Adopsi" 
+                  color="#a55eea" 
+                  onPress={() => handleProtectedPress('/riwayat')} 
+                />
+
             </View>
         </View>
 
@@ -96,7 +157,7 @@ export default function BerandaScreen() {
             </View>
         </View>
 
-        {/* FOOTER SIMPLE */}
+        {/* FOOTER */}
         <View style={styles.footer}>
             <Text style={styles.footerText}>© 2025 MeowLarat Mobile App</Text>
         </View>
@@ -106,7 +167,7 @@ export default function BerandaScreen() {
   );
 }
 
-// Komponen Kecil untuk Kerapian
+// Komponen Pendukung UI
 const MenuIcon = ({ icon, label, color, onPress }: any) => (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
         <View style={[styles.iconCircle, { backgroundColor: color }]}>
@@ -125,7 +186,7 @@ const StatCard = ({ number, label, icon }: any) => (
 );
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background }, // Background Kuning Muda
+  container: { flex: 1, backgroundColor: Colors.background }, 
   header: { 
     flexDirection: 'row', 
     alignItems: 'center', 
@@ -170,10 +231,10 @@ const styles = StyleSheet.create({
 
   menuContainer: { padding: 20 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text, marginBottom: 15 },
-  menuGrid: { flexDirection: 'row', justifyContent: 'space-between' },
-  menuItem: { alignItems: 'center' },
+  menuGrid: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  menuItem: { alignItems: 'center', width: '22%' },
   iconCircle: { width: 55, height: 55, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 5, elevation: 3 },
-  menuLabel: { fontSize: 12, color: Colors.text },
+  menuLabel: { fontSize: 11, color: Colors.text, textAlign: 'center' },
 
   statsSection: { padding: 20, backgroundColor: Colors.white, marginHorizontal: 20, borderRadius: 15, elevation: 2, marginBottom: 20 },
   statsHeader: { fontSize: 16, fontWeight: 'bold', color: Colors.text, marginBottom: 15, textAlign: 'center' },
