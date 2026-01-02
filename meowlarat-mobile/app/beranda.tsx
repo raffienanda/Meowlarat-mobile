@@ -123,7 +123,7 @@ export default function BerandaScreen() {
                 {/* 2. Artikel (Bebas Akses) */}
                 <MenuIcon 
                   icon="book" 
-                  label="Artikel" 
+                  label="Cat Pedia" 
                   color="#4ecdc4" 
                   onPress={() => router.push('/artikel')} 
                 />

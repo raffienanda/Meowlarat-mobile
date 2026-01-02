@@ -5,26 +5,75 @@ const prisma = new PrismaClient();
 
 async function main() {
   // --- BAGIAN 1: PETPLACE (Biarkan seperti semula) ---
-  console.log('🌱 Memulai seeding data Petplaces...');
   await prisma.petplace.deleteMany();
 
   const petplaces = [
     {
       nama: "Meow City Petshop",
       category: "Petshop",
-      img_url: "petshop3.png",
+      img_url: "petshop3.png", 
       address: "Jl. Ir. H. Juanda No. 100, Dago, Bandung",
       latitude: -6.8858,
       longitude: 107.6143,
       rating: 5,
       description: "Menyediakan makanan premium dan aksesoris lucu."
     },
+    {
+      nama: "Klinik Hewan Sehat",
+      category: "Vet",
+      img_url: "vet1.png",
+      address: "Jl. Sunda No. 55, Sumurbandung, Bandung",
+      latitude: -6.9175,
+      longitude: 107.6191,
+      rating: 5,
+      description: "Dokter hewan berpengalaman siap siaga 24 jam untuk anabul sakit."
+    },
+    {
+      nama: "Fluffy Grooming Spa",
+      category: "Grooming",
+      img_url: "grooming1.png",
+      address: "Jl. LLRE Martadinata (Riau) No. 12, Bandung",
+      latitude: -6.9094, 
+      longitude: 107.6180,
+      rating: 4,
+      description: "Layanan spa, mandi kutu, dan potong kuku yang bikin anabul rileks."
+    },
+    {
+      nama: "Pet Kingdom Sukajadi",
+      category: "Petshop",
+      img_url: "petshop1.png",
+      address: "Jl. Sukajadi No. 135, Bandung",
+      latitude: -6.8902,
+      longitude: 107.5960,
+      rating: 5,
+      description: "Supermarket kebutuhan hewan terlengkap dengan area bermain."
+    },
+    {
+      nama: "Happy Paws Store",
+      category: "Petshop",
+      img_url: "petshop2.png",
+      address: "Jl. Buah Batu No. 200, Bandung",
+      latitude: -6.9450,
+      longitude: 107.6300,
+      rating: 4,
+      description: "Diskon makanan kucing kering dan basah setiap hari Jumat."
+    },
+    {
+      nama: "Dr. Meow Vet Care",
+      category: "Vet",
+      img_url: "vet1.png", // Menggunakan gambar vet yang sama jika stok gambar terbatas
+      address: "Jl. Dr. Setiabudi No. 45, Bandung",
+      latitude: -6.8700,
+      longitude: 107.5990,
+      rating: 5,
+      description: "Spesialis vaksinasi, sterilisasi, dan operasi minor."
+    }
   ];
 
   for (const place of petplaces) {
     await prisma.petplace.create({ data: place });
   }
-  console.log(`✅ Data petplace selesai.`);
+  console.log(`✅ Data petplace (${petplaces.length} lokasi) selesai.`);
 
   // --- BAGIAN 2: TOKO ONLINE (Biarkan seperti semula) ---
   console.log('🌱 Memulai seeding Toko Online...');
