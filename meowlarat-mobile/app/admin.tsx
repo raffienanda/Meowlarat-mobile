@@ -1,12 +1,14 @@
+// meowlarat-mobile/app/admin.tsx
 import React, { useEffect, useState, useMemo } from 'react';
 import { 
-  View, Text, FlatList, Image, TouchableOpacity, Modal, StyleSheet, SafeAreaView, RefreshControl, TextInput, ScrollView
+  View, Text, FlatList, Image, TouchableOpacity, Modal, StyleSheet, SafeAreaView, RefreshControl, TextInput, Alert
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // <--- IMPORT INI
 
-const API_URL = 'http://192.168.18.12:3000'; 
+const API_URL = 'http://192.168.18.12:3000'; // Pastikan IP sesuai
 
 // --- INTERFACES ---
 interface AdoptionRequest {
@@ -56,10 +58,8 @@ export default function AdminScreen() {
   const [currentView, setCurrentView] = useState<AdminView>('MENU_UTAMA');
   const [selectedCatName, setSelectedCatName] = useState<string>('');
   
-  // State untuk menyimpan teks balasan admin per laporan
   const [adminResponse, setAdminResponse] = useState<Record<number, string>>({});
 
-  // --- STATE CUSTOM ALERT ---
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState({
     type: 'confirm' as AlertType,
@@ -71,8 +71,24 @@ export default function AdminScreen() {
   });
 
   useEffect(() => {
-    loadAllData();
+    checkAdminAccess(); // <--- CEK AKSES DULU
   }, []);
+
+  // FUNGSI CEK ROLE (SATPAM)
+  const checkAdminAccess = async () => {
+    try {
+      const role = await AsyncStorage.getItem('role');
+      if (role !== 'ADMIN') {
+        Alert.alert("Akses Ditolak ⛔", "Halaman ini khusus untuk Admin.", [
+          { text: "Kembali", onPress: () => router.replace('/beranda') }
+        ]);
+      } else {
+        loadAllData(); // Kalau Admin, baru ambil data
+      }
+    } catch (e) {
+      router.replace('/beranda');
+    }
+  };
 
   const loadAllData = () => {
     fetchRequests();
@@ -84,7 +100,9 @@ export default function AdminScreen() {
     try {
       const response = await fetch(`${API_URL}/api/cats/requests`);
       const data = await response.json();
-      setRequests(data.filter((r: AdoptionRequest) => r.status === 'PENDING'));
+      if (Array.isArray(data)) {
+        setRequests(data.filter((r: AdoptionRequest) => r.status === 'PENDING'));
+      }
     } catch (error) { console.error(error); } 
     finally { setLoading(false); }
   };
@@ -94,8 +112,9 @@ export default function AdminScreen() {
     try {
       const response = await fetch(`${API_URL}/api/lapor/all`);
       const data = await response.json();
-      // Filter: Tampilkan yang PENDING atau DIPROSES (SELESAI disembunyikan)
-      setLaporan(data.filter((l: LaporanUser) => l.status !== 'SELESAI'));
+      if (Array.isArray(data)) {
+         setLaporan(data.filter((l: LaporanUser) => l.status !== 'SELESAI'));
+      }
     } catch (error) { console.error(error); }
     finally { setLoading(false); }
   };
@@ -111,8 +130,10 @@ export default function AdminScreen() {
   const catsWithRequests = useMemo(() => {
     const grouped: Record<string, AdoptionRequest[]> = {};
     requests.forEach((req) => {
-      if (!grouped[req.cat.nama]) grouped[req.cat.nama] = [];
-      grouped[req.cat.nama].push(req);
+      if (req.cat && req.cat.nama) {
+        if (!grouped[req.cat.nama]) grouped[req.cat.nama] = [];
+        grouped[req.cat.nama].push(req);
+      }
     });
     return Object.keys(grouped).map(catName => ({
       catName,
@@ -122,7 +143,7 @@ export default function AdminScreen() {
   }, [requests]);
 
   const candidateList = useMemo(() => {
-    return requests.filter(req => req.cat.nama === selectedCatName);
+    return requests.filter(req => req.cat?.nama === selectedCatName);
   }, [requests, selectedCatName]);
 
   const handleApprove = (reqId: number, userName: string, catName: string) => {
@@ -145,7 +166,7 @@ export default function AdminScreen() {
     });
   };
 
-  // --- LOGIC LAPORAN (DENGAN TAHAP PROSES) ---
+  // --- LOGIC LAPORAN ---
   const handleUpdateStatusLaporan = (id: number, nextStatus: string) => {
     const responTxt = adminResponse[id] || "Sedang dalam tindak lanjut admin.";
     const title = nextStatus === 'DIPROSES' ? 'Proses Laporan?' : 'Selesaikan Laporan?';
@@ -160,7 +181,6 @@ export default function AdminScreen() {
           body: JSON.stringify({ status: nextStatus, response: responTxt })
         });
         if (res.ok) {
-           // Jika selesai, hapus dari state input agar bersih
            if (nextStatus === 'SELESAI') {
               setAdminResponse(prev => { const n = {...prev}; delete n[id]; return n; });
            }
@@ -197,6 +217,7 @@ export default function AdminScreen() {
         data={laporan}
         keyExtractor={item => item.id.toString()}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchLaporan} />}
+        ListEmptyComponent={<Text style={{textAlign:'center', marginTop: 20, color:'#888'}}>Tidak ada laporan aktif.</Text>}
         renderItem={({ item }) => (
           <View style={styles.compactCard}>
             <View style={styles.compactHeaderRow}>
@@ -205,10 +226,9 @@ export default function AdminScreen() {
                   <Text style={{ fontSize: 10, color: item.status === 'DIPROSES' ? '#1976d2' : '#ef6c00', fontWeight: 'bold' }}>{item.status}</Text>
                </View>
             </View>
-            
             <Image source={{ uri: `${API_URL}/uploads/img-lapor/${item.img_url}` }} style={styles.reportImg} />
             <Text style={styles.compactMsg}>"{item.isi}"</Text>
-            <Text style={{ fontSize: 11, color: '#888' }}>📍 {item.location}</Text>
+            <Text style={{ fontSize: 11, color: '#888' }}>📍 {item.location} | 👤 {item.username}</Text>
             
             <TextInput 
               style={styles.inputRespon} 
@@ -219,17 +239,11 @@ export default function AdminScreen() {
 
             <View style={styles.compactActionRow}>
               {item.status === 'PENDING' && (
-                <TouchableOpacity 
-                  style={[styles.btnAction, { backgroundColor: '#1976d2' }]} 
-                  onPress={() => handleUpdateStatusLaporan(item.id, 'DIPROSES')}
-                >
+                <TouchableOpacity style={[styles.btnAction, { backgroundColor: '#1976d2' }]} onPress={() => handleUpdateStatusLaporan(item.id, 'DIPROSES')}>
                   <Text style={styles.btnTextWhite}>Proses</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity 
-                style={[styles.btnAction, { backgroundColor: '#28a745' }]} 
-                onPress={() => handleUpdateStatusLaporan(item.id, 'SELESAI')}
-              >
+              <TouchableOpacity style={[styles.btnAction, { backgroundColor: '#28a745' }]} onPress={() => handleUpdateStatusLaporan(item.id, 'SELESAI')}>
                 <Text style={styles.btnTextWhite}>Selesaikan</Text>
               </TouchableOpacity>
             </View>
@@ -239,10 +253,11 @@ export default function AdminScreen() {
     </View>
   );
 
-  // --- RENDER LIST KUCING & KANDIDAT ---
   const renderCatSelection = () => (
     <View style={{ flex: 1, padding: 15 }}>
-      <FlatList data={catsWithRequests} keyExtractor={i=>i.catName} numColumns={2} renderItem={({item})=>(
+      <FlatList data={catsWithRequests} keyExtractor={i=>i.catName} numColumns={2} 
+        ListEmptyComponent={<Text style={{textAlign:'center', marginTop: 20, color:'#888'}}>Tidak ada permintaan adopsi.</Text>}
+        renderItem={({item})=>(
         <TouchableOpacity style={styles.catCardSelect} onPress={()=>{setSelectedCatName(item.catName); setCurrentView('LIST_KANDIDAT');}}>
           <Image source={{uri:`${API_URL}/uploads/img-lapor/${item.catDetails.img_url}`}} style={styles.catCardImage}/>
           <View style={styles.catCardInfo}><Text style={styles.catCardName}>{item.catName}</Text><Text style={styles.catCardCount}>{item.totalRequests} Pelamar</Text></View>
@@ -253,9 +268,11 @@ export default function AdminScreen() {
 
   const renderCandidateList = () => (
     <View style={{ flex: 1, padding: 15 }}>
+      <Text style={styles.sectionHeader}>Pelamar untuk {selectedCatName}:</Text>
       <FlatList data={candidateList} keyExtractor={i=>i.id.toString()} renderItem={({item})=>(
         <View style={styles.compactCard}>
-          <Text style={styles.compactName}>{item.user.nama}</Text>
+          <Text style={styles.compactName}>{item.user.nama} <Text style={{fontWeight:'normal', fontSize:12}}>({item.user.username})</Text></Text>
+          <Text style={{fontSize:12, color:'#666'}}>Pekerjaan: {item.user.pekerjaan} | Gaji: {item.user.gaji}</Text>
           <Text style={styles.compactMsg}>"{item.message}"</Text>
           <View style={styles.compactActionRow}>
             <TouchableOpacity style={styles.btnCompactReject} onPress={()=>handleReject(item.id)}><Text style={styles.btnTextCompactReject}>Tolak</Text></TouchableOpacity>
@@ -305,13 +322,13 @@ const styles = StyleSheet.create({
   menuContainer: { flex: 1, padding: 20 },
   menuTitle: { fontSize: 24, fontWeight: 'bold', color: Colors.primary },
   menuSubtitle: { color: '#666', marginBottom: 20 },
-  menuCard: { backgroundColor: '#fff', padding: 20, borderRadius: 15, elevation: 3 },
-  iconCircle: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  menuCard: { backgroundColor: '#fff', padding: 20, borderRadius: 15, elevation: 3, flexDirection:'row', alignItems:'center', gap: 15 },
+  iconCircle: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
   menuCardTitle: { fontSize: 18, fontWeight: 'bold' },
-  menuCardDesc: { color: '#888' },
+  menuCardDesc: { color: '#888', fontSize: 12 },
   sectionHeader: { fontSize: 16, fontWeight: 'bold', marginBottom: 15 },
   catCardSelect: { backgroundColor: '#fff', width: '47%', margin: '1.5%', borderRadius: 10, elevation: 2 },
-  catCardImage: { width: '100%', height: 100, borderTopLeftRadius: 10, borderTopRightRadius: 10 },
+  catCardImage: { width: '100%', height: 100, borderTopLeftRadius: 10, borderTopRightRadius: 10, resizeMode: 'cover' },
   catCardInfo: { padding: 10 },
   catCardName: { fontWeight: 'bold', color: Colors.primary },
   catCardCount: { fontSize: 12, color: '#666' },
@@ -319,7 +336,7 @@ const styles = StyleSheet.create({
   compactHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   compactName: { fontWeight: 'bold', fontSize: 16 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 2, borderRadius: 10 },
-  reportImg: { width: '100%', height: 150, borderRadius: 8, marginVertical: 10 },
+  reportImg: { width: '100%', height: 150, borderRadius: 8, marginVertical: 10, resizeMode: 'cover' },
   compactMsg: { fontStyle: 'italic', marginBottom: 5, color: '#444' },
   inputRespon: { backgroundColor: '#f0f0f0', borderRadius: 5, padding: 10, marginTop: 10, fontSize: 13 },
   compactActionRow: { flexDirection: 'row', gap: 10, marginTop: 15 },

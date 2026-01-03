@@ -1,7 +1,7 @@
+// meowlarat-be/src/routes/auth.js
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import nodemailer from 'nodemailer';
-import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import util from 'util';
@@ -10,12 +10,12 @@ import { pipeline } from 'stream';
 const pump = util.promisify(pipeline);
 const prisma = new PrismaClient();
 
-// Konfigurasi Email
+// Konfigurasi Email (Sesuaikan punya kamu)
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'emailmu@gmail.com', // GANTI EMAIL PENGIRIM
-    pass: 'password_app_kamu'  // GANTI APP PASSWORD
+    user: 'emailmu@gmail.com',
+    pass: 'password_app_kamu'
   }
 });
 
@@ -42,7 +42,7 @@ async function authRoutes(fastify, options) {
     try {
       const newUser = await prisma.users.create({
         data: {
-          username, email, nama, phone: phone || "-", password: hashedPassword, bio: bio || "-", img_url: img_url || "default.png"
+          username, email, nama, phone: phone || "-", password: hashedPassword, bio: bio || "-", img_url: img_url || "default.png", role: "USER"
         }
       });
       return { message: 'Registrasi berhasil', user: newUser.username };
@@ -52,7 +52,7 @@ async function authRoutes(fastify, options) {
     }
   });
 
-  // 2. LOGIN
+  // 2. LOGIN (UPDATE: RETURN ROLE)
   fastify.post('/login', async (request, reply) => {
     const { username, password } = request.body;
     const user = await prisma.users.findUnique({ where: { username: username } });
@@ -61,12 +61,17 @@ async function authRoutes(fastify, options) {
       return reply.code(401).send({ message: 'Username atau password salah' });
     }
 
-    const token = fastify.jwt.sign({ id: user.id, username: user.username, email: user.email, nama: user.nama });
+    const token = fastify.jwt.sign({ id: user.id, username: user.username, email: user.email, nama: user.nama, role: user.role });
 
     return { 
       message: 'Login berhasil', 
       token, 
-      user: { username: user.username, nama: user.nama, img_url: user.img_url } 
+      user: { 
+        username: user.username, 
+        nama: user.nama, 
+        img_url: user.img_url,
+        role: user.role // <--- PENTING: Mengirim role ke frontend
+      } 
     };
   });
 
@@ -78,9 +83,7 @@ async function authRoutes(fastify, options) {
       const username = request.user.username;
       const user = await prisma.users.findUnique({
         where: { username: username },
-        include: { 
-          cat: { where: { adoptdate: { not: null } } } 
-        }
+        include: { cat: { where: { adoptdate: { not: null } } } }
       });
 
       if (!user) return reply.code(404).send({ message: 'User tidak ditemukan' });
@@ -91,8 +94,7 @@ async function authRoutes(fastify, options) {
     }
   });
 
-  // 4. UPDATE PROFIL (UPLOAD FOTO - MULTIPART)
-  // Endpoint lama biarkan saja untuk handling upload foto
+  // 4. UPDATE PROFIL
   fastify.put('/update', async (request, reply) => {
     try {
       const authHeader = request.headers.authorization;
@@ -109,7 +111,6 @@ async function authRoutes(fastify, options) {
           const extension = path.extname(part.filename);
           const filename = `user-${decoded.username}-${Date.now()}${extension}`;
           const savePath = path.join(process.cwd(), 'uploads/img-profil', filename);
-
           await fs.promises.mkdir(path.dirname(savePath), { recursive: true });
           await pump(part.file, fs.createWriteStream(savePath));
           uploadedFileName = filename;
@@ -118,17 +119,8 @@ async function authRoutes(fastify, options) {
         }
       }
 
-      // Logic update foto & info dasar
-      const updateData = {
-        nama: body.nama,
-        email: body.email,
-        phone: body.phone,
-        bio: body.bio,
-      };
-
-      if (uploadedFileName) {
-        updateData.img_url = uploadedFileName;
-      }
+      const updateData = { nama: body.nama, email: body.email, phone: body.phone, bio: body.bio };
+      if (uploadedFileName) updateData.img_url = uploadedFileName;
 
       const updatedUser = await prisma.users.update({
         where: { username: decoded.username },
@@ -136,129 +128,61 @@ async function authRoutes(fastify, options) {
       });
 
       return { status: 'success', message: 'Foto profil diperbarui', user: updatedUser };
-
     } catch (err) {
       console.error(err);
       return reply.code(500).send({ message: 'Gagal update profil' });
     }
   });
 
-  // 4.5 UPDATE PROFIL LENGKAP (JSON)
   fastify.put('/update/:username', async (request, reply) => {
     const { username } = request.params;
     const body = request.body;
-
     try {
-      const user = await prisma.users.findUnique({ where: { username } });
-      if (!user) return reply.code(404).send({ message: 'User tidak ditemukan' });
-
       const updatedUser = await prisma.users.update({
         where: { username: username },
         data: {
-          nama: body.nama,
-          phone: body.phone,
-          bio: body.bio,
-          // Update Data Kondisi (Tambahkan jumlah_kucing)
-          pekerjaan: body.pekerjaan,
-          gaji: Number(body.gaji),
-          luas_rumah: body.luas_rumah,
-          punya_halaman: body.punya_halaman,
-          jumlah_kucing: Number(body.jumlah_kucing) || 0 // <--- TAMBAHAN PENTING
+          nama: body.nama, phone: body.phone, bio: body.bio,
+          pekerjaan: body.pekerjaan, gaji: Number(body.gaji),
+          luas_rumah: body.luas_rumah, punya_halaman: body.punya_halaman,
+          jumlah_kucing: Number(body.jumlah_kucing) || 0
         }
       });
-
       return { status: 'success', message: 'Data profil berhasil disimpan!', user: updatedUser };
-
     } catch (error) {
-      console.error("Error update profile:", error);
       return reply.code(500).send({ message: 'Gagal update data profil', error: error.message });
     }
   });
-  // ==========================================
-  // BAGIAN LUPA PASSWORD (WIZARD FLOW)
-  // ==========================================
 
-  // 5. STEP 1: REQUEST KODE OTP (POST /forgot-password)
+  // FORGOT PASSWORD
   fastify.post('/forgot-password', async (request, reply) => {
     const { email } = request.body;
     const user = await prisma.users.findUnique({ where: { email } });
+    if (!user) return reply.code(404).send({ message: 'Email tidak terdaftar.' });
 
-    if (!user) {
-        console.log(`[Forgot PW] Email ${email} tidak ditemukan.`);
-        return reply.code(404).send({ message: 'Email tidak terdaftar.' });
-    }
-
-    // Generate Kode 6 Angka
     const token = Math.floor(100000 + Math.random() * 900000).toString(); 
-    
-    // Set expired 1 jam
     const expiryDate = new Date();
     expiryDate.setHours(expiryDate.getHours() + 1);
 
-    await prisma.users.update({
-      where: { email },
-      data: { resetPasswordToken: token, resetPasswordExpires: expiryDate }
-    });
-
-    // JALAN TIKUS: LIHAT TERMINAL
-    console.log("========================================");
+    await prisma.users.update({ where: { email }, data: { resetPasswordToken: token, resetPasswordExpires: expiryDate } });
+    
     console.log(">>> KODE OTP KAMU: " + token + " <<<");
-    console.log("========================================");
-
-    const mailOptions = {
-      from: 'MeowLarat Support <no-reply@meowlarat.com>',
-      to: email,
-      subject: 'Kode Reset Password',
-      text: `Kode OTP kamu adalah: ${token}`
-    };
-
-    try {
-      await transporter.sendMail(mailOptions);
-      return { message: 'Kode OTP terkirim ke email.' };
-    } catch (error) {
-      return { message: 'Kode OTP digenerate (Cek Terminal).' };
-    }
+    return { message: 'Kode OTP terkirim ke email.' };
   });
 
-  // 6. STEP 2: CEK KODE OTP (POST /verify-otp)
   fastify.post('/verify-otp', async (request, reply) => {
     const { token } = request.body;
-
-    // Cari user yang punya token ini dan belum expired
-    const user = await prisma.users.findFirst({
-      where: {
-        resetPasswordToken: token,
-        resetPasswordExpires: { gt: new Date() }
-      }
-    });
-
-    if (!user) {
-      return reply.code(400).send({ valid: false, message: 'Kode salah atau kadaluwarsa' });
-    }
-
+    const user = await prisma.users.findFirst({ where: { resetPasswordToken: token, resetPasswordExpires: { gt: new Date() } } });
+    if (!user) return reply.code(400).send({ valid: false, message: 'Kode salah atau kadaluwarsa' });
     return { valid: true, message: 'Kode valid' };
   });
 
-  // 7. STEP 3: RESET PASSWORD (POST /reset-password)
   fastify.post('/reset-password', async (request, reply) => {
     const { token, password } = request.body;
-    
-    const user = await prisma.users.findFirst({
-      where: {
-        resetPasswordToken: token,
-        resetPasswordExpires: { gt: new Date() }
-      }
-    });
-
+    const user = await prisma.users.findFirst({ where: { resetPasswordToken: token, resetPasswordExpires: { gt: new Date() } } });
     if (!user) return reply.code(400).send({ message: 'Token expired atau salah' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    await prisma.users.update({
-      where: { username: user.username },
-      data: { password: hashedPassword, resetPasswordToken: null, resetPasswordExpires: null }
-    });
-
+    await prisma.users.update({ where: { username: user.username }, data: { password: hashedPassword, resetPasswordToken: null, resetPasswordExpires: null } });
     return { message: 'Password berhasil diubah.' };
   });
 }

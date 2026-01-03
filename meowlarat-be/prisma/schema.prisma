@@ -1,3 +1,5 @@
+// meowlarat-be/prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -32,7 +34,7 @@ model cat {
   isTaken   Boolean  @default(false)
 
   // Relasi ke User (Pemenang)
-  users          users?          @relation(fields: [adopter], references: [username], onDelete: NoAction, onUpdate: NoAction)
+  users          users? @relation(fields: [adopter], references: [username], onDelete: NoAction, onUpdate: NoAction)
   
   // Relasi ke Laporan Tanggung Jawab
   tanggungjawab  tanggungjawab[]
@@ -71,15 +73,14 @@ model donasi {
   users                        users  @relation(fields: [username], references: [username], onDelete: NoAction, onUpdate: NoAction)
 }
 
-// === MODEL INI SUDAH DIPERBAIKI ISI KOLOMNYA ===
 model laporan {
   id        Int      @id @default(autoincrement())
-  username  String   @db.VarChar(255) // Ditambahkan
-  judul     String   @db.VarChar(255) // Menggantikan category
-  isi       String   @db.Text         // Menggantikan deskripsi/notes
-  location  String   @db.VarChar(255) // Menggantikan lokasi
+  username  String   @db.VarChar(255) 
+  judul     String   @db.VarChar(255) 
+  isi       String   @db.Text         
+  location  String   @db.VarChar(255) 
   img_url   String   @db.VarChar(255)
-  date      DateTime @default(now())  // Ditambahkan
+  date      DateTime @default(now())  
   status    String   @default("PENDING") 
   response  String?  @default("-")      
 
@@ -170,6 +171,9 @@ model users {
   bio      String @db.VarChar(255)
   img_url  String @db.VarChar(255)
 
+  // Role Admin/User (DEFAULT "USER")
+  role     String @default("USER") // <--- KOLOM BARU
+
   // DATA KONDISI
   pekerjaan     String?  @default("-") @db.VarChar(100)
   gaji          Int?     @default(0)
@@ -187,5 +191,5 @@ model users {
   posts             posts[]
   threads           threads[]
   adoption_requests adoption_requests[]
-  laporan           laporan[] // <--- DITAMBAHKAN AGAR BISA DIAKSES backend
+  laporan           laporan[] 
 }

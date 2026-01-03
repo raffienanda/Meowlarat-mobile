@@ -8,7 +8,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 
-// IP Address Laptop Kamu
+// IP Address Laptop Kamu (Pastikan sama dengan Backend)
 const API_URL = 'http://192.168.18.12:3000'; 
 
 export default function ProfilScreen() {
@@ -42,6 +42,7 @@ export default function ProfilScreen() {
         setUserData(session.user || session); 
         setIsLoggedIn(true);
 
+        // Update data terbaru dari server (termasuk cek apakah role berubah)
         try {
             const response = await fetch(`${API_URL}/api/auth/me`, {
                 method: 'GET',
@@ -50,8 +51,11 @@ export default function ProfilScreen() {
             const newData = await response.json();
             if (response.ok) {
                 setUserData(newData); 
+                // Update session & role
                 const newSession = { token: token, user: newData };
                 await AsyncStorage.setItem('user_session', JSON.stringify(newSession));
+                // Pastikan role tersimpan juga biar aman
+                if (newData.role) await AsyncStorage.setItem('role', newData.role);
             }
         } catch (err) {
             console.log("Background fetch error");
@@ -79,11 +83,23 @@ export default function ProfilScreen() {
       const result = await response.json();
 
       if (response.ok) {
+        // 1. Simpan Session
         const sessionData = { token: result.token, user: result.user };
         await AsyncStorage.setItem('user_session', JSON.stringify(sessionData));
+        
+        // 2. SIMPAN ROLE (PENTING BUAT ADMIN)
+        await AsyncStorage.setItem('role', result.user.role);
+
         setUserData(sessionData.user);
         setIsLoggedIn(true);
+        
         Alert.alert("Berhasil", "Selamat datang kembali!");
+
+        // 3. LOGIC REDIRECT ADMIN
+        if (result.user.role === 'ADMIN') {
+           router.replace('/admin'); // Pindah ke halaman admin
+        }
+
       } else {
         Alert.alert("Gagal", result.message || "Login gagal");
       }
@@ -97,6 +113,7 @@ export default function ProfilScreen() {
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem('user_session');
+      await AsyncStorage.removeItem('role'); // Hapus role juga
       setIsLoggedIn(false);
       setUserData(null);
       setUsername('');
@@ -122,7 +139,7 @@ export default function ProfilScreen() {
             <TextInput 
                 style={styles.input} 
                 placeholder="Username" 
-                placeholderTextColor="#999"  // <--- INI SOLUSINYA BIAR KELIHATAN
+                placeholderTextColor="#999"  
                 value={username} 
                 onChangeText={setUsername} 
                 autoCapitalize="none" 
@@ -135,7 +152,7 @@ export default function ProfilScreen() {
             <TextInput 
                 style={styles.input} 
                 placeholder="Password" 
-                placeholderTextColor="#999" // <--- INI SOLUSINYA BIAR KELIHATAN
+                placeholderTextColor="#999" 
                 value={password} 
                 onChangeText={setPassword} 
                 secureTextEntry 
@@ -182,9 +199,25 @@ export default function ProfilScreen() {
           />
           <Text style={styles.userName}>{userData?.nama || userData?.username}</Text>
           <Text style={styles.userBio}>{userData?.bio || "Pecinta Kucing Sejati"}</Text>
+          
+          {/* BADGE ADMIN JIKA LOGIN SEBAGAI ADMIN */}
+          {userData?.role === 'ADMIN' && (
+            <View style={{ backgroundColor: '#e3f2fd', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, marginTop: 5 }}>
+                <Text style={{ color: Colors.primary, fontWeight: 'bold', fontSize: 12 }}>ADMINISTRATOR</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.menuSection}>
+          {/* MENU KHUSUS ADMIN */}
+          {userData?.role === 'ADMIN' && (
+             <MenuItem 
+               icon="shield-checkmark" 
+               text="Dashboard Admin" 
+               onPress={() => router.push('/admin')} 
+             />
+          )}
+
           <MenuItem 
             icon="paw" 
             text="Riwayat Adopsi Saya" 
@@ -226,7 +259,6 @@ const styles = StyleSheet.create({
   inputContainer: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: '#ccc', marginBottom: 20, paddingBottom: 5 },
   icon: { marginRight: 10 },
   
-  // SAYA TAMBAHKAN COLOR: '#333' BIAR TINTANYA HITAM
   input: { flex: 1, fontSize: 16, paddingVertical: 8, color: '#333' },
 
   registerContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
