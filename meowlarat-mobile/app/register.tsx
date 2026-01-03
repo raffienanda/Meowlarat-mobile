@@ -8,7 +8,7 @@ import { Colors } from '../constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 
 // Pastikan IP Address ini sesuai dengan backend (laptop) kamu
-const API_URL = 'http://192.168.18.12:3000'; 
+const API_URL = 'http://192.168.100.15:3000'; 
 
 export default function RegisterScreen() {
   const router = useRouter();

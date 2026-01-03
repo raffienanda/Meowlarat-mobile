@@ -9,14 +9,13 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../constants/Colors';
 
-// Pastikan IP ini sesuai dengan IP laptop kamu (jika pakai emulator/device fisik via WiFi)
-const API_URL = 'http://192.168.18.12:3000'; 
+// --- UPDATE IP DISINI SESUAI PERMINTAAN BOS ---
+const API_URL = 'http://192.168.100.15:3000'; 
 
 export default function TanggungJawabScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   
-  // Ambil params dengan aman (handle jika array)
   const catId = Array.isArray(params.catId) ? params.catId[0] : params.catId;
   const catName = params.catName;
   const adoptDate = params.adoptDate;
@@ -27,19 +26,20 @@ export default function TanggungJawabScreen() {
   const [loading, setLoading] = useState(false);
   const [dropdownVisible, setDropdownVisible] = useState(false);
 
-  // State 3 Foto
+  // State untuk menyimpan data laporan dari Server
+  const [serverReport, setServerReport] = useState<any>(null);
+
+  // State 3 Foto (Preview)
   const [imgMakanan, setImgMakanan] = useState<string | null>(null);
   const [imgAktivitas, setImgAktivitas] = useState<string | null>(null);
   const [imgKotoran, setImgKotoran] = useState<string | null>(null);
 
-  // --- LOGIKA HITUNG HARI ---
+  // --- 1. HITUNG HARI & FETCH DATA SAAT HALAMAN DIBUKA ---
   useEffect(() => {
     if (adoptDate) {
       const start = new Date(adoptDate as string);
       const now = new Date();
-
       const diffTime = now.getTime() - start.getTime();
-      // Math.max(1, ...) memastikan minimal hari ke-1
       const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24))); 
       
       setDaysPassed(diffDays);
@@ -48,26 +48,76 @@ export default function TanggungJawabScreen() {
       if (diffDays <= 7) activeWeek = 1;
       else if (diffDays <= 14) activeWeek = 2;
       else if (diffDays <= 21) activeWeek = 3;
-      else activeWeek = 4; // Lewat 21 hari = Selesai
+      else activeWeek = 4; 
 
       setCurrentActiveWeek(activeWeek);
       
-      // Set dropdown otomatis ke minggu aktif jika valid (1-3)
+      // Default pilih minggu aktif
       if (activeWeek >= 1 && activeWeek <= 3) {
         setWeek(activeWeek.toString());
       } else {
         setWeek('Selesai');
       }
     }
-  }, [adoptDate]);
 
-  // --- PILIH FOTO ---
+    // PANGGIL DATA DARI SERVER (Agar gambar muncul pas refresh)
+    if (catId) {
+        fetchReportData();
+    }
+  }, [adoptDate, catId]);
+
+  // --- 2. FUNGSI AMBIL DATA DARI BACKEND ---
+  const fetchReportData = async () => {
+    try {
+        const response = await fetch(`${API_URL}/api/tanggungjawab/${catId}`);
+        const data = await response.json();
+        if (response.ok) {
+            setServerReport(data); // Simpan data mentah dari server
+        }
+    } catch (error) {
+        console.error("Gagal mengambil data laporan:", error);
+    }
+  };
+
+  // --- 3. LOGIKA TAMPILKAN GAMBAR BERDASARKAN MINGGU ---
+  useEffect(() => {
+    // Reset gambar dulu setiap ganti minggu
+    setImgMakanan(null);
+    setImgAktivitas(null);
+    setImgKotoran(null);
+
+    if (!week || week === 'Selesai' || !serverReport) return;
+
+    const w = parseInt(week);
+    
+    // Helper bikin URL gambar dari backend
+    const getUrl = (filename: string | null) => 
+        filename ? `${API_URL}/uploads/img-tanggungjawab/${filename}` : null;
+
+    // Cek data dari server, kalau ada filenya, tampilkan!
+    if (w === 1) {
+        if (serverReport.gambarmakanan1) setImgMakanan(getUrl(serverReport.gambarmakanan1));
+        if (serverReport.gambaraktivitas1) setImgAktivitas(getUrl(serverReport.gambaraktivitas1));
+        if (serverReport.gambarkotoran1) setImgKotoran(getUrl(serverReport.gambarkotoran1));
+    } else if (w === 2) {
+        if (serverReport.gambarmakanan2) setImgMakanan(getUrl(serverReport.gambarmakanan2));
+        if (serverReport.gambaraktivitas2) setImgAktivitas(getUrl(serverReport.gambaraktivitas2));
+        if (serverReport.gambarkotoran2) setImgKotoran(getUrl(serverReport.gambarkotoran2));
+    } else if (w === 3) {
+        if (serverReport.gambarmakanan3) setImgMakanan(getUrl(serverReport.gambarmakanan3));
+        if (serverReport.gambaraktivitas3) setImgAktivitas(getUrl(serverReport.gambaraktivitas3));
+        if (serverReport.gambarkotoran3) setImgKotoran(getUrl(serverReport.gambarkotoran3));
+    }
+  }, [week, serverReport]);
+
+
+  // --- PILIH FOTO DARI GALERI ---
   const pickImage = async (type: 'makanan' | 'aktivitas' | 'kotoran') => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.5, // Kompres biar ringan uploadnya
+      quality: 0.5,
     });
 
     if (!result.canceled) {
@@ -78,96 +128,63 @@ export default function TanggungJawabScreen() {
     }
   };
 
-  // --- SUBMIT DATA (DIPERBAIKI) ---
+  // --- SUBMIT DATA ---
   const handleSubmit = async () => {
-    // 1. Validasi Input
     if (currentActiveWeek > 3) {
         return Alert.alert("Selesai", "Masa pemantauan sudah selesai.");
     }
-    // Pastikan week punya nilai
     if (!week || (week !== 'Selesai' && parseInt(week) !== currentActiveWeek)) {
-        return Alert.alert("Salah Minggu", `Sekarang hari ke-${daysPassed} (Minggu ke-${currentActiveWeek}). Pastikan pilih minggu yang sesuai.`);
+        return Alert.alert("Salah Minggu", `Sekarang hari ke-${daysPassed}. Harap isi laporan Minggu ke-${currentActiveWeek}.`);
     }
+    
     if (!imgMakanan || !imgAktivitas || !imgKotoran) {
-      return Alert.alert("Data Kurang", "Wajib upload 3 foto bukti (Makanan, Aktivitas, Kotoran).");
+      return Alert.alert("Data Kurang", "Wajib upload 3 foto bukti.");
     }
 
     setLoading(true);
     try {
       const session = await AsyncStorage.getItem('user_session');
-      if (!session) { 
-        Alert.alert("Error", "Sesi habis, silakan login ulang."); 
-        setLoading(false);
-        return; 
-      }
-
-      // --- CLEANING TOKEN ---
+      if (!session) { setLoading(false); return; }
       const parsedSession = JSON.parse(session);
       let token = parsedSession.token;
+      if (token.startsWith('"') && token.endsWith('"')) token = token.slice(1, -1);
 
-      if (!token) {
-        Alert.alert("Error", "Token hilang. Silakan Login ulang.");
-        return;
-      }
-      
-      // Hapus tanda kutip jika ada (misal "ey..." jadi ey...)
-      if (token.startsWith('"') && token.endsWith('"')) {
-        token = token.slice(1, -1);
-      }
-
-      console.log("Token Clean:", token);
-
-      // 2. Siapkan FormData
       const formData = new FormData();
-      
-      // PENTING: Append text sebagai string
       formData.append('cat_id', String(catId));
       formData.append('week', String(week));
 
-      // Fungsi helper append file
       const appendFile = (uri: string, fieldName: string) => {
-        const filename = uri.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename || '');
-        const type = match ? `image/${match[1]}` : `image/jpeg`;
-        
-        // @ts-ignore (React Native FormData specific)
-        formData.append(fieldName, { 
-          uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''), 
-          name: filename || `upload-${Date.now()}.jpg`, 
-          type 
-        });
+        // Hanya upload jika user memilih gambar baru (bukan gambar load dari server)
+        if (uri && (uri.startsWith('file://') || uri.startsWith('content://'))) {
+            const filename = uri.split('/').pop();
+            const match = /\.(\w+)$/.exec(filename || '');
+            const type = match ? `image/${match[1]}` : `image/jpeg`;
+            // @ts-ignore
+            formData.append(fieldName, { uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''), name: filename, type });
+        }
       };
 
       appendFile(imgMakanan, 'bukti_makanan');
       appendFile(imgAktivitas, 'bukti_aktivitas');
       appendFile(imgKotoran, 'bukti_kotoran');
 
-      // 3. Kirim ke Backend
       const response = await fetch(`${API_URL}/api/tanggungjawab`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}` 
-          // JANGAN cantumkan 'Content-Type': 'multipart/form-data' secara manual!
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        Alert.alert("Berhasil", `Laporan Minggu ke-${week} diterima! Terima kasih.`);
-        router.back(); 
+        Alert.alert("Berhasil", `Laporan Minggu ${week} tersimpan!`);
+        fetchReportData(); // Refresh data agar gambar tetap muncul
       } else {
-        console.log("Server Response:", result);
-        if (result.message && result.message.includes("token")) {
-           Alert.alert("Sesi Error", "Token tidak valid. Coba Logout dan Login lagi.");
-        } else {
-           Alert.alert("Gagal", result.message || "Gagal mengirim laporan.");
-        }
+        Alert.alert("Gagal", result.message || "Gagal mengirim laporan.");
       }
     } catch (error) {
-      console.error("Network Error:", error);
-      Alert.alert("Error", "Gagal menghubungi server. Periksa koneksi internet.");
+      console.error(error);
+      Alert.alert("Error", "Gagal menghubungi server.");
     } finally {
       setLoading(false);
     }
@@ -188,7 +205,6 @@ export default function TanggungJawabScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.subHeader}>Kucing: <Text style={{fontWeight:'bold', color:Colors.primary}}>{catName}</Text></Text>
 
-        {/* INFO BOX */}
         <View style={styles.infoBox}>
             <Ionicons name="calendar" size={20} color="#004085" />
             <Text style={styles.infoBoxText}>
@@ -205,7 +221,6 @@ export default function TanggungJawabScreen() {
           <Ionicons name="chevron-down" size={20} color="#666" />
         </TouchableOpacity>
 
-        {/* Modal Dropdown */}
         <Modal visible={dropdownVisible} transparent animationType="fade">
           <TouchableOpacity style={styles.modalOverlay} onPress={() => setDropdownVisible(false)}>
             <View style={styles.modalContent}>

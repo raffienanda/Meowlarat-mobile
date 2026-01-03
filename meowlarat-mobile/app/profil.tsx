@@ -1,47 +1,69 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   StyleSheet, View, Text, TextInput, TouchableOpacity, 
-  Image, Alert, ActivityIndicator, SafeAreaView, ScrollView 
+  Image, Alert, ActivityIndicator, SafeAreaView, ScrollView, RefreshControl 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 
-// GANTI DENGAN IP LAPTOP KAMU
-const API_URL = 'http://192.168.18.12:3000'; 
+// IP Address Laptop Kamu
+const API_URL = 'http://192.168.100.15:3000'; 
 
 export default function ProfilScreen() {
   const router = useRouter();
   
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [userData, setUserData] = useState<any>(null);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
-  useEffect(() => {
-    checkLoginStatus();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      checkLoginStatus();
+    }, [])
+  );
 
   const checkLoginStatus = async () => {
     try {
       const jsonValue = await AsyncStorage.getItem('user_session');
       if (jsonValue != null) {
         const session = JSON.parse(jsonValue);
-        if (session.user) {
-          setUserData(session.user);
-        } else {
-          setUserData(session);
+        let token = session.token;
+        if (token && token.startsWith('"') && token.endsWith('"')) {
+            token = token.slice(1, -1);
         }
+
+        setUserData(session.user || session); 
         setIsLoggedIn(true);
+
+        try {
+            const response = await fetch(`${API_URL}/api/auth/me`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const newData = await response.json();
+            if (response.ok) {
+                setUserData(newData); 
+                const newSession = { token: token, user: newData };
+                await AsyncStorage.setItem('user_session', JSON.stringify(newSession));
+            }
+        } catch (err) {
+            console.log("Background fetch error");
+        }
+      } else {
+        setIsLoggedIn(false);
       }
     } catch(e) {
-      console.error("Gagal membaca data login");
+      console.error("Login Check Error");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -85,6 +107,7 @@ export default function ProfilScreen() {
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={Colors.primary}/></View>;
 
+  // --- TAMPILAN BELUM LOGIN ---
   if (!isLoggedIn) {
     return (
       <SafeAreaView style={styles.container}>
@@ -93,15 +116,38 @@ export default function ProfilScreen() {
           <Text style={styles.title}>Masuk Meowlarat</Text>
           <Text style={styles.subtitle}>Kelola adopsi dan pantau kucingmu</Text>
 
+          {/* INPUT USERNAME */}
           <View style={styles.inputContainer}>
             <Ionicons name="person-outline" size={20} color="#666" style={styles.icon} />
-            <TextInput style={styles.input} placeholder="Username" value={username} onChangeText={setUsername} autoCapitalize="none" />
+            <TextInput 
+                style={styles.input} 
+                placeholder="Username" 
+                placeholderTextColor="#999"  // <--- INI SOLUSINYA BIAR KELIHATAN
+                value={username} 
+                onChangeText={setUsername} 
+                autoCapitalize="none" 
+            />
           </View>
 
+          {/* INPUT PASSWORD */}
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.icon} />
-            <TextInput style={styles.input} placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
+            <TextInput 
+                style={styles.input} 
+                placeholder="Password" 
+                placeholderTextColor="#999" // <--- INI SOLUSINYA BIAR KELIHATAN
+                value={password} 
+                onChangeText={setPassword} 
+                secureTextEntry 
+            />
           </View>
+
+          <TouchableOpacity 
+            onPress={() => router.push('/forgot-password')} 
+            style={{ alignSelf: 'flex-end', marginBottom: 20 }}
+          >
+            <Text style={{ color: Colors.primary, fontWeight: 'bold' }}>Lupa Password?</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity style={[styles.btn, styles.btnLogin]} onPress={handleLogin} disabled={loginLoading}>
             {loginLoading ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>Masuk</Text>}
@@ -118,12 +164,20 @@ export default function ProfilScreen() {
     );
   }
 
+  // --- TAMPILAN SUDAH LOGIN ---
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.profileContent}>
+      <ScrollView 
+        contentContainerStyle={styles.profileContent}
+        refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); checkLoginStatus(); }} />
+        }
+      >
         <View style={styles.headerProfile}>
           <Image 
-            source={{ uri: userData?.img_url ? `${API_URL}/uploads/${userData.img_url}` : 'https://via.placeholder.com/150' }} 
+            source={{ uri: userData?.img_url && userData.img_url !== 'default.png' 
+                ? `${API_URL}/uploads/img-profil/${userData.img_url}` 
+                : 'https://via.placeholder.com/150' }} 
             style={styles.avatar} 
           />
           <Text style={styles.userName}>{userData?.nama || userData?.username}</Text>
@@ -131,14 +185,18 @@ export default function ProfilScreen() {
         </View>
 
         <View style={styles.menuSection}>
-          {/* MENU YANG SUDAH DIAKTIFKAN */}
           <MenuItem 
             icon="paw" 
             text="Riwayat Adopsi Saya" 
-            onPress={() => router.push('/riwayat')} // <-- Mengarah ke halaman baru
+            onPress={() => router.push('/riwayat')} 
           />
           <MenuItem icon="heart" text="Donasi Saya" onPress={() => router.push('/donasi')} />
-          <MenuItem icon="settings" text="Pengaturan Akun" />
+          
+          <MenuItem 
+            icon="settings" 
+            text="Pengaturan Akun" 
+            onPress={() => router.push('/edit-profile')} 
+          />
         </View>
 
         <TouchableOpacity style={[styles.btn, styles.btnLogout]} onPress={handleLogout}>
@@ -149,7 +207,7 @@ export default function ProfilScreen() {
   );
 }
 
-// Komponen Menu Diperbarui (Menerima onPress)
+// Komponen Menu Helper
 const MenuItem = ({ icon, text, onPress }: { icon: any, text: string, onPress?: () => void }) => (
   <TouchableOpacity style={styles.menuItem} onPress={onPress}>
     <Ionicons name={icon} size={24} color={Colors.primary} />
@@ -167,7 +225,10 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 40 },
   inputContainer: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: '#ccc', marginBottom: 20, paddingBottom: 5 },
   icon: { marginRight: 10 },
-  input: { flex: 1, fontSize: 16, paddingVertical: 8 },
+  
+  // SAYA TAMBAHKAN COLOR: '#333' BIAR TINTANYA HITAM
+  input: { flex: 1, fontSize: 16, paddingVertical: 8, color: '#333' },
+
   registerContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
   linkText: { color: Colors.primary, fontWeight: 'bold' },
   profileContent: { padding: 20, alignItems: 'center' },
@@ -180,6 +241,6 @@ const styles = StyleSheet.create({
   menuText: { flex: 1, fontSize: 16, marginLeft: 15, color: '#333' },
   btn: { padding: 15, borderRadius: 10, alignItems: 'center', width: '100%' },
   btnLogin: { backgroundColor: Colors.primary, marginTop: 10 },
-  btnLogout: { backgroundColor: Colors.danger, marginTop: 10 },
+  btnLogout: { backgroundColor: '#ef5350', marginTop: 10 },
   btnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
 });
