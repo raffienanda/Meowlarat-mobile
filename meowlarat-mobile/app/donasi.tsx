@@ -11,7 +11,7 @@ import { Colors } from '../constants/Colors';
 import { metode } from '../types';
 
 // ⚠️ GANTI IP SESUAI CONFIG KAMU
-const API_URL = 'http://192.168.100.15:3000'; 
+const API_URL = 'http://192.168.18.12:3000'; 
 
 // Interface untuk data history donasi
 interface DonasiLog {

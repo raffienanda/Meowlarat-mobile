@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 
 // IP Address Laptop Kamu
-const API_URL = 'http://192.168.100.15:3000'; 
+const API_URL = 'http://192.168.18.12:3000'; 
 
 export default function ProfilScreen() {
   const router = useRouter();

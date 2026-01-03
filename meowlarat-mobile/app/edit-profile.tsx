@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 
-const API_URL = 'http://192.168.100.15:3000'; 
+const API_URL = 'http://192.168.18.12:3000'; 
 
 export default function EditProfileScreen() {
   const router = useRouter();

@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../constants/Colors';
 
 // --- UPDATE IP DISINI SESUAI PERMINTAAN BOS ---
-const API_URL = 'http://192.168.100.15:3000'; 
+const API_URL = 'http://192.168.18.12:3000'; 
 
 export default function TanggungJawabScreen() {
   const router = useRouter();
