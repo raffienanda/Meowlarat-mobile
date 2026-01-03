@@ -91,7 +91,8 @@ async function authRoutes(fastify, options) {
     }
   });
 
-  // 4. UPDATE PROFIL (PUT)
+  // 4. UPDATE PROFIL (UPLOAD FOTO - MULTIPART)
+  // Endpoint lama biarkan saja untuk handling upload foto
   fastify.put('/update', async (request, reply) => {
     try {
       const authHeader = request.headers.authorization;
@@ -117,6 +118,7 @@ async function authRoutes(fastify, options) {
         }
       }
 
+      // Logic update foto & info dasar
       const updateData = {
         nama: body.nama,
         email: body.email,
@@ -133,7 +135,7 @@ async function authRoutes(fastify, options) {
         data: updateData
       });
 
-      return { status: 'success', message: 'Profil diperbarui', user: updatedUser };
+      return { status: 'success', message: 'Foto profil diperbarui', user: updatedUser };
 
     } catch (err) {
       console.error(err);
@@ -141,6 +143,37 @@ async function authRoutes(fastify, options) {
     }
   });
 
+  // 4.5 UPDATE PROFIL LENGKAP (JSON)
+  fastify.put('/update/:username', async (request, reply) => {
+    const { username } = request.params;
+    const body = request.body;
+
+    try {
+      const user = await prisma.users.findUnique({ where: { username } });
+      if (!user) return reply.code(404).send({ message: 'User tidak ditemukan' });
+
+      const updatedUser = await prisma.users.update({
+        where: { username: username },
+        data: {
+          nama: body.nama,
+          phone: body.phone,
+          bio: body.bio,
+          // Update Data Kondisi (Tambahkan jumlah_kucing)
+          pekerjaan: body.pekerjaan,
+          gaji: Number(body.gaji),
+          luas_rumah: body.luas_rumah,
+          punya_halaman: body.punya_halaman,
+          jumlah_kucing: Number(body.jumlah_kucing) || 0 // <--- TAMBAHAN PENTING
+        }
+      });
+
+      return { status: 'success', message: 'Data profil berhasil disimpan!', user: updatedUser };
+
+    } catch (error) {
+      console.error("Error update profile:", error);
+      return reply.code(500).send({ message: 'Gagal update data profil', error: error.message });
+    }
+  });
   // ==========================================
   // BAGIAN LUPA PASSWORD (WIZARD FLOW)
   // ==========================================

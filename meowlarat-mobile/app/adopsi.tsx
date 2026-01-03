@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   StyleSheet, View, Text, FlatList, Image, TouchableOpacity, 
-  Modal, Alert, ActivityIndicator, SafeAreaView, RefreshControl, Platform 
+  Modal, ActivityIndicator, SafeAreaView, RefreshControl, Platform 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage'; 
-import { useRouter, useFocusEffect } from 'expo-router'; // Tambahkan useFocusEffect
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons'; 
 import { Colors } from '../constants/Colors';
 import { cat } from '../types';
@@ -23,14 +23,27 @@ export default function AdopsiScreen() {
   // State UI
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'available' | 'status' | 'history'>('available');
-  const [modalVisible, setModalVisible] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false); // Modal Detail Kucing
   const [selectedCat, setSelectedCat] = useState<cat | null>(null);
+
+  // --- MODAL KHUSUS ---
+  const [validationModalVisible, setValidationModalVisible] = useState(false); // Kuning (Profil)
+
+  // --- STATE ALERT CUSTOM (PENGGANTI ALERT BAWAAN) ---
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: 'info', // 'success' | 'error' | 'info' | 'confirm'
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    confirmText: 'Oke',
+    showCancel: false,
+    cancelText: 'Batal'
+  });
   
   // State User
   const [userSession, setUserSession] = useState<any>(null);
 
-  // --- PERBAIKAN DI SINI (Ganti useEffect dengan useFocusEffect) ---
-  // Kode ini akan jalan setiap kali layar "Adopsi" dilihat/difokuskan
   useFocusEffect(
     useCallback(() => {
       checkSession();
@@ -54,9 +67,33 @@ export default function AdopsiScreen() {
         const parsed = JSON.parse(jsonValue);
         setUserSession(parsed.user || parsed);
       } else {
-        setUserSession(null); // Reset jika logout
+        setUserSession(null);
       }
     } catch(e) { console.error("Gagal baca sesi"); }
+  };
+
+  // --- HELPER UNTUK MEMUNCULKAN CUSTOM ALERT ---
+  const showAlert = (
+    type: 'success' | 'error' | 'info' | 'confirm', 
+    title: string, 
+    message: string, 
+    onConfirm?: () => void,
+    confirmText: string = 'Oke'
+  ) => {
+    setAlertConfig({
+      visible: true,
+      type,
+      title,
+      message,
+      onConfirm: onConfirm || (() => setAlertConfig(prev => ({...prev, visible: false}))),
+      confirmText,
+      showCancel: type === 'confirm', // Cuma tipe confirm yang ada tombol Batal
+      cancelText: 'Batal'
+    });
+  };
+
+  const closeAlert = () => {
+    setAlertConfig(prev => ({ ...prev, visible: false }));
   };
 
   const fetchCats = async () => {
@@ -90,40 +127,54 @@ export default function AdopsiScreen() {
 
   const handleAdopt = async () => {
     if (!selectedCat) return;
-    if (!userSession) return Alert.alert("Login", "Silakan login terlebih dahulu.");
+    if (!userSession) return showAlert('info', 'Login Diperlukan', 'Silakan login terlebih dahulu untuk mengadopsi.');
 
     try {
         const response = await fetch(`${API_URL}/api/cats/adopt/${selectedCat.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: userSession.username }), 
+            body: JSON.stringify({ 
+              username: userSession.username,
+              message: "Saya berminat adopsi" 
+            }), 
         });
-        const result = await response.json();
-        if (response.ok) {
-            Alert.alert("Berhasil", "Permintaan terkirim!");
-            setModalVisible(false);
-            setActiveTab('status');
-        } else {
-            Alert.alert("Gagal", result.message);
-        }
-    } catch (error) { Alert.alert("Error", "Gagal menghubungi server"); }
-  };
 
-  const handleTakeCat = async (catId: number, catName: string) => {
-    if (Platform.OS === 'web') {
-      // @ts-ignore
-      const confirm = window.confirm(`Siap membawa pulang ${catName}?`);
-      if (confirm) await executeTakeCat(catId, catName);
-    } else {
-      Alert.alert(
-        "Konfirmasi Penjemputan", 
-        `Siap membawa pulang ${catName}?`,
-        [{ text: "Batal" }, { text: "Ya", onPress: () => executeTakeCat(catId, catName) }]
-      );
+        const result = await response.json();
+
+        if (response.ok) {
+            setModalVisible(false); // Tutup detail kucing
+            // Tampilkan Alert Sukses (Biru)
+            showAlert('success', 'Berhasil Dikirim! 🚀', 'Permintaan adopsi kamu sudah masuk antrian. Cek statusnya berkala ya.', () => {
+                setAlertConfig(prev => ({...prev, visible: false}));
+                setActiveTab('status'); 
+            }, 'Siap!');
+        } 
+        else {
+            if (result.code === 'PROFILE_INCOMPLETE') {
+                setModalVisible(false);
+                setValidationModalVisible(true); // Buka modal kuning profil (Spesial Case)
+            } 
+            else {
+                // Tampilkan Alert Error (Merah)
+                showAlert('error', 'Gagal Mengajukan', result.message || "Terjadi kesalahan.");
+            }
+        }
+    } catch (error) { 
+        console.error(error);
+        showAlert('error', 'Koneksi Gagal', 'Gagal menghubungi server.'); 
     }
   };
 
+  const handleTakeCat = async (catId: number, catName: string) => {
+    // Tampilkan Alert Confirm (Biru dengan Cancel)
+    showAlert('confirm', 'Jemput Kucing?', `Kamu sudah siap membawa pulang ${catName}? Pastikan kamu sudah di lokasi ya.`, 
+        () => executeTakeCat(catId, catName), 
+        'Ya, Saya Siap!'
+    );
+  };
+
   const executeTakeCat = async (catId: number, catName: string) => {
+    closeAlert(); // Tutup confirm sebelumnya
     try {
       const response = await fetch(`${API_URL}/api/cats/take/${catId}`, {
         method: 'PUT',
@@ -131,16 +182,17 @@ export default function AdopsiScreen() {
         body: JSON.stringify({})
       });
       if (response.ok) {
-         Alert.alert("Selamat!", `${catName} resmi jadi milikmu!`);
-         setActiveTab('history');
+         showAlert('success', 'Selamat! 🎉', `${catName} resmi jadi milikmu!`, () => {
+             setAlertConfig(prev => ({...prev, visible: false}));
+             setActiveTab('history');
+         });
       } else {
-         Alert.alert("Gagal", "Gagal memproses data.");
+         showAlert('error', 'Gagal', 'Gagal memproses data.');
       }
-    } catch(e) { Alert.alert("Error", "Gagal koneksi server."); }
+    } catch(e) { showAlert('error', 'Error', 'Gagal koneksi server.'); }
   };
 
   // --- RENDER ITEMS ---
-
   const renderAvailableItem = ({ item }: { item: cat }) => (
     <TouchableOpacity style={styles.card} onPress={() => { setSelectedCat(item); setModalVisible(true); }}>
       <Image source={{ uri: `${API_URL}/uploads/img-lapor/${item.img_url}` }} style={styles.cardImage} />
@@ -222,8 +274,7 @@ export default function AdopsiScreen() {
              key={tab}
              style={[styles.tabButton, activeTab === tab && styles.tabActive]} 
              onPress={() => {
-                // Logika ini sekarang akan membaca userSession yang sudah di-refresh oleh useFocusEffect
-                if (tab !== 'available' && !userSession) Alert.alert("Login", "Silakan login dulu.");
+                if (tab !== 'available' && !userSession) showAlert('info', 'Login Dulu', 'Silakan login untuk mengakses fitur ini.');
                 else setActiveTab(tab as any);
              }}
           >
@@ -255,7 +306,7 @@ export default function AdopsiScreen() {
         )}
       </View>
 
-      {/* MODAL */}
+      {/* --- MODAL DETAIL KUCING --- */}
       <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -278,6 +329,96 @@ export default function AdopsiScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* --- MODAL ALERT CUSTOM (BIRU/MERAH SESUAI TEMA) --- */}
+      <Modal 
+        animationType="fade" 
+        transparent={true} 
+        visible={alertConfig.visible} 
+        onRequestClose={closeAlert}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.alertContent}>
+            {/* Ikon Dinamis */}
+            <View style={[
+                styles.alertIconContainer, 
+                { backgroundColor: alertConfig.type === 'error' ? '#ffebee' : '#e3f2fd' }
+            ]}>
+               <Ionicons 
+                  name={
+                      alertConfig.type === 'success' ? 'checkmark-circle' : 
+                      alertConfig.type === 'error' ? 'alert-circle' : 
+                      alertConfig.type === 'confirm' ? 'help-circle' : 'information-circle'
+                  } 
+                  size={40} 
+                  color={alertConfig.type === 'error' ? Colors.danger : Colors.primary} 
+               />
+            </View>
+
+            <Text style={[
+                styles.alertTitle, 
+                { color: alertConfig.type === 'error' ? Colors.danger : Colors.primary }
+            ]}>
+                {alertConfig.title}
+            </Text>
+            
+            <Text style={styles.alertMessage}>
+              {alertConfig.message}
+            </Text>
+
+            <View style={styles.alertActions}>
+                {alertConfig.showCancel && (
+                    <TouchableOpacity style={[styles.alertBtn, styles.alertBtnCancel]} onPress={closeAlert}>
+                        <Text style={styles.alertBtnTextCancel}>{alertConfig.cancelText}</Text>
+                    </TouchableOpacity>
+                )}
+                
+                <TouchableOpacity 
+                    style={[
+                        styles.alertBtn, 
+                        styles.alertBtnConfirm,
+                        { backgroundColor: alertConfig.type === 'error' ? Colors.danger : Colors.primary }
+                    ]} 
+                    onPress={alertConfig.onConfirm}
+                >
+                    <Text style={styles.alertBtnTextConfirm}>{alertConfig.confirmText}</Text>
+                </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- MODAL WARNING PROFIL (KUNING TETAP DIPERTAHANKAN) --- */}
+      <Modal 
+        animationType="fade" 
+        transparent={true} 
+        visible={validationModalVisible} 
+        onRequestClose={() => setValidationModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.warningModalContent}>
+            <View style={styles.warningIconContainer}>
+               <Ionicons name="clipboard" size={40} color="#fff" />
+            </View>
+            <Text style={styles.warningTitle}>Profil Belum Lengkap!</Text>
+            <Text style={styles.warningMessage}>
+              Supaya bisa adopsi kucing, kami butuh data tambahan (Pekerjaan, Gaji, Info Rumah) di profil kamu.
+            </Text>
+            <View style={styles.warningActionButtons}>
+                <TouchableOpacity style={styles.btnSecondary} onPress={() => setValidationModalVisible(false)}>
+                    <Text style={styles.btnSecondaryText}>Nanti Deh</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.btnPrimary} onPress={() => {
+                      setValidationModalVisible(false);
+                      router.push('/edit-profile'); 
+                  }}>
+                    <Text style={styles.btnPrimaryText}>Lengkapi 🚀</Text>
+                </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -315,13 +456,10 @@ const styles = StyleSheet.create({
     historyDate: { fontSize: 11, color: '#888', fontStyle: 'italic', marginBottom: 6 },
     adoptedBadge: { backgroundColor: '#e3f2fd', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
     adoptedText: { fontSize: 10, color: Colors.primary, fontWeight: 'bold' },
-    
-    // BUTTON STYLE
     btnReport: { marginTop: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: Colors.primary, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, alignItems: 'center', alignSelf: 'flex-start' },
     btnReportText: { fontSize: 11, color: Colors.primary, fontWeight: 'bold' },
-
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 },
-    modalContent: { backgroundColor: '#fff', borderRadius: 20, padding: 20 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalContent: { backgroundColor: '#fff', borderRadius: 20, padding: 20, width: '100%' },
     modalImage: { width: '100%', height: 250, borderRadius: 12, marginBottom: 16 },
     modalName: { fontSize: 24, fontWeight: 'bold', color: Colors.primary, textAlign: 'center', marginBottom: 10 },
     bodyText: { fontSize: 16, marginBottom: 5, color: '#333' },
@@ -330,4 +468,87 @@ const styles = StyleSheet.create({
     btnCancelText: { color: Colors.danger, fontWeight: 'bold' },
     btnAdopt: { flex: 2, padding: 12, backgroundColor: Colors.primary, borderRadius: 10, alignItems: 'center' },
     btnAdoptText: { color: '#fff', fontWeight: 'bold' },
+
+    // === STYLE ALERT CUSTOM ===
+    alertContent: {
+      backgroundColor: '#fff',
+      borderRadius: 16,
+      padding: 24,
+      width: '85%',
+      maxWidth: 350,
+      alignItems: 'center',
+      elevation: 5
+    },
+    alertIconContainer: {
+      padding: 12,
+      borderRadius: 50,
+      marginBottom: 16
+    },
+    alertTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      marginBottom: 8,
+      textAlign: 'center'
+    },
+    alertMessage: {
+      fontSize: 14,
+      color: '#666',
+      textAlign: 'center',
+      marginBottom: 24,
+      lineHeight: 20
+    },
+    alertActions: {
+      flexDirection: 'row',
+      width: '100%',
+      gap: 12
+    },
+    alertBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    alertBtnCancel: {
+      backgroundColor: '#fff',
+      borderWidth: 1,
+      borderColor: '#ccc'
+    },
+    alertBtnConfirm: {
+      // Background color set dynamic di inline style
+      elevation: 2
+    },
+    alertBtnTextCancel: {
+      color: '#666',
+      fontWeight: 'bold'
+    },
+    alertBtnTextConfirm: {
+      color: '#fff',
+      fontWeight: 'bold'
+    },
+
+    // STYLE MODAL WARNING (KUNING)
+    warningModalContent: {
+      backgroundColor: Colors.background,
+      borderRadius: 20,
+      padding: 25,
+      width: '90%',
+      maxWidth: 400,
+      alignItems: 'center',
+      elevation: 10,
+    },
+    warningIconContainer: {
+      backgroundColor: Colors.warning,
+      padding: 15,
+      borderRadius: 50,
+      marginBottom: 15,
+      elevation: 5
+    },
+    warningTitle: { fontSize: 20, fontWeight: 'bold', color: Colors.text, marginBottom: 10, textAlign: 'center' },
+    warningMessage: { fontSize: 14, color: '#555', textAlign: 'center', marginBottom: 25, lineHeight: 22 },
+    warningActionButtons: { flexDirection: 'row', gap: 12, width: '100%' },
+    btnSecondary: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: Colors.gray, alignItems: 'center', backgroundColor: '#fff' },
+    btnSecondaryText: { color: Colors.gray, fontWeight: 'bold' },
+    btnPrimary: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: Colors.primary, alignItems: 'center', elevation: 2 },
+    btnPrimaryText: { color: '#fff', fontWeight: 'bold' },
 });

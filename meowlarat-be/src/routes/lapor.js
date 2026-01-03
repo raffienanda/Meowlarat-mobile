@@ -1,92 +1,106 @@
-// src/routes/lapor.js
 import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
+import path from 'path';
 import util from 'util';
 import { pipeline } from 'stream';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 const pump = util.promisify(pipeline);
 const prisma = new PrismaClient();
 
-// Setup path untuk ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+async function laporRoutes(fastify, options) {
 
-async function routes(fastify, options) {
+  // 1. BUAT LAPORAN BARU (POST)
   fastify.post('/', async (request, reply) => {
     try {
-      // Folder tujuan: meowlarat-be/uploads/lapor
-      const uploadDir = path.join(__dirname, '../../uploads/img-lapor');
-      
-      // Buat folder jika belum ada
-      if (!fs.existsSync(uploadDir)){
-          fs.mkdirSync(uploadDir, { recursive: true });
-      }
-
       const parts = request.parts();
-      
-      let category = '';
-      let lokasi = '';
-      let deskripsi = '';
-      let notes = '';
-      let img_url = ''; // Default jika user tidak upload foto
+      let body = {};
+      let uploadedFileName = null;
 
-      // Loop semua field yang dikirim dari Frontend
       for await (const part of parts) {
-        if (part.type === 'file') {
-          // --- Proses File Gambar ---
-          const fileExtension = path.extname(part.filename);
-          const uniqueFileName = `lapor-${Date.now()}${fileExtension}`;
-          const savePath = path.join(uploadDir, uniqueFileName);
-          
-          // Simpan file ke disk
+        if (part.file) {
+          const extension = path.extname(part.filename);
+          const filename = `lapor-${Date.now()}${extension}`;
+          const savePath = path.join(process.cwd(), 'uploads/img-lapor', filename);
+
+          await fs.promises.mkdir(path.dirname(savePath), { recursive: true });
           await pump(part.file, fs.createWriteStream(savePath));
-          
-          // Simpan URL gambar (sesuai setting prefix di server.js)
-          img_url = `http://localhost:3000/uploads/img-lapor/${uniqueFileName}`;
-          
+          uploadedFileName = filename;
         } else {
-          // --- Proses Text Data ---
-          // Pastikan nama field ini SAMA PERSIS dengan yang dikirim Frontend (FormData)
-          if (part.fieldname === 'jenis_laporan') category = part.value;
-          if (part.fieldname === 'lokasi_kucing') lokasi = part.value;
-          if (part.fieldname === 'deskripsi_singkat') deskripsi = part.value;
-          if (part.fieldname === 'catatan_tambahan') notes = part.value;
+          body[part.fieldname] = part.value;
         }
       }
 
-      // Validasi data minimal (sesuai prisma schema)
-      if (!category || !lokasi || !deskripsi) {
-        return reply.code(400).send({ message: 'Mohon lengkapi data wajib (Kategori, Lokasi, Deskripsi)' });
-      }
-
-      // Jika user tidak upload foto, gunakan placeholder
-      if (!img_url) {
-         img_url = 'https://placehold.co/600x400?text=No+Image';
-      }
-
-      // Simpan ke Database
-      const newLaporan = await prisma.laporan.create({
+      // PERBAIKAN: Pakai 'prisma.laporan' (sesuai nama tabelmu)
+      const newReport = await prisma.laporan.create({
         data: {
-          category,
-          lokasi,
-          deskripsi,
-          img_url,
-          notes: notes || '', // Default string kosong jika notes tidak ada
-        },
+          username: body.username,
+          judul: body.judul,
+          isi: body.isi,
+          location: body.location || "-",
+          img_url: uploadedFileName || "default-lapor.png",
+          date: new Date(),
+          status: 'PENDING', 
+          response: '-'
+        }
       });
 
-      return reply.code(201).send({
-        message: 'Laporan berhasil dikirim!',
-        data: newLaporan
-      });
+      return { success: true, message: 'Laporan berhasil dikirim!', data: newReport };
 
     } catch (error) {
-      fastify.log.error(error);
-      return reply.code(500).send({ message: 'Terjadi kesalahan server', error: error.message });
+      console.error(error);
+      return reply.code(500).send({ message: 'Gagal mengirim laporan', error: error.message });
     }
   });
+
+  // 2. GET RIWAYAT LAPORAN USER (GET)
+  fastify.get('/history/:username', async (request, reply) => {
+    const { username } = request.params;
+    try {
+      // PERBAIKAN: Pakai 'prisma.laporan'
+      const reports = await prisma.laporan.findMany({
+        where: { username: username },
+        orderBy: { date: 'desc' }
+      });
+      return reports;
+    } catch (error) {
+      return reply.code(500).send({ message: 'Gagal mengambil riwayat', error: error.message });
+    }
+  });
+
+  // 3. GET SEMUA LAPORAN (UNTUK ADMIN & FEED WARGA)
+  fastify.get('/all', async (request, reply) => {
+    try {
+      // PERBAIKAN: Pakai 'prisma.laporan'
+      const reports = await prisma.laporan.findMany({
+        orderBy: { date: 'desc' },
+        include: { users: true } // Relasi ke tabel 'users'
+      });
+      return reports;
+    } catch (error) {
+      return reply.code(500).send({ message: 'Gagal ambil data', error: error.message });
+    }
+  });
+
+  // 4. UPDATE STATUS LAPORAN (UNTUK ADMIN)
+  fastify.put('/status/:id', async (request, reply) => {
+    const { id } = request.params;
+    const { status, response } = request.body; 
+
+    try {
+      // PERBAIKAN: Pakai 'prisma.laporan'
+      const updated = await prisma.laporan.update({
+        where: { id: Number(id) },
+        data: { 
+          status: status,
+          response: response || undefined 
+        }
+      });
+      return { success: true, message: 'Status laporan diupdate', data: updated };
+    } catch (error) {
+      return reply.code(500).send({ message: 'Gagal update status', error: error.message });
+    }
+  });
+
 }
 
-export default routes;
+export default laporRoutes;
