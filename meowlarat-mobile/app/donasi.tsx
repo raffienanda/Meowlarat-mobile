@@ -10,10 +10,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 import { metode } from '../types';
 
-// ⚠️ PASTIKAN IP INI BENAR SESUAI CONFIG KAMU
+// ⚠️ GANTI IP SESUAI CONFIG KAMU
 const API_URL = 'http://192.168.18.12:3000'; 
 
-// Interface untuk data history donasi (Tabel Transparansi)
+// Interface untuk data history donasi
 interface DonasiLog {
   id: number;
   username: string;
@@ -27,13 +27,11 @@ interface DonasiLog {
 export default function DonasiScreen() {
   const router = useRouter();
   
-  // State Form
   const [nominal, setNominal] = useState('');
   const [pesan, setPesan] = useState('');
   const [selectedMetode, setSelectedMetode] = useState<number | null>(null);
   const [image, setImage] = useState<string | null>(null);
   
-  // State Data & UI
   const [metodes, setMetodes] = useState<metode[]>([]);
   const [donations, setDonations] = useState<DonasiLog[]>([]); 
   const [totalDonasi, setTotalDonasi] = useState(0); 
@@ -99,13 +97,17 @@ export default function DonasiScreen() {
     if (!selectedMetode) return Alert.alert("Peringatan", "Pilih metode pembayaran");
     if (!image) return Alert.alert("Peringatan", "Sertakan bukti transfer");
 
-    let userSession = null;
+    let username = null;
     try {
         const jsonValue = await AsyncStorage.getItem('user_session');
-        if (jsonValue) userSession = JSON.parse(jsonValue);
+        if (jsonValue) {
+            const session = JSON.parse(jsonValue);
+            // FIX: Ambil username dari struktur yang benar (session.user.username)
+            username = session.user?.username || session.username;
+        }
     } catch (e) { console.error("Gagal baca sesi"); }
 
-    if (!userSession) {
+    if (!username) {
         return Alert.alert("Belum Login", "Mohon login terlebih dahulu.", [
             { text: "Batal", style: "cancel" },
             { text: "Login", onPress: () => router.push('/profil') }
@@ -119,9 +121,8 @@ export default function DonasiScreen() {
       formData.append('nominal', nominal);
       formData.append('pesan', pesan);
       formData.append('metode', selectedMetode.toString()); 
-      formData.append('username', userSession.username); 
+      formData.append('username', username); // FIX: Kirim username yang sudah valid
 
-      // Proses file gambar
       const filename = image.split('/').pop();
       const match = /\.(\w+)$/.exec(filename || '');
       const type = match ? `image/${match[1]}` : `image`;
@@ -132,11 +133,10 @@ export default function DonasiScreen() {
         type,
       } as any); 
 
-      // --- PERBAIKAN VITAL: TANPA HEADER MANUAL ---
+      // Request tanpa header content-type manual (Biarkan otomatis)
       const response = await fetch(`${API_URL}/api/donasi`, {
         method: 'POST',
         body: formData,
-        // Header Content-Type dihapus agar boundary otomatis terisi oleh sistem
       });
 
       const result = await response.json();
@@ -147,7 +147,7 @@ export default function DonasiScreen() {
         setPesan('');
         setImage(null);
         setSelectedMetode(null);
-        fetchDonations(); // Refresh data
+        fetchDonations(); 
       } else {
         Alert.alert("Gagal", result.message || "Terjadi kesalahan.");
       }
@@ -228,7 +228,6 @@ export default function DonasiScreen() {
                                     {m.nama}
                                 </Text>
                                 
-                                {/* Label Coming Soon */}
                                 {!isActive && (
                                     <View style={styles.comingSoonBadge}>
                                         <Text style={styles.comingSoonText}>Soon</Text>
@@ -240,12 +239,11 @@ export default function DonasiScreen() {
                 </ScrollView>
             )}
 
-            {/* DETAIL REKENING & QRIS */}
             {currentMetode && (
                 <View style={styles.rekInfo}>
                     <Text style={styles.rekTitle}>Silakan transfer ke:</Text>
                     
-                    {/* --- LOGIKA QRIS BESAR (E-Wallet) --- */}
+                    {/* QRIS / E-WALLET (GAMBAR BESAR) */}
                     {currentMetode.logo && (currentMetode.category === 'E-Wallet' || currentMetode.nama.includes('QRIS')) ? (
                         <View style={styles.qrisWrapper}>
                             <Text style={styles.scanTextHeader}>SCAN QRIS DI BAWAH</Text>
@@ -258,7 +256,7 @@ export default function DonasiScreen() {
                         </View>
                     ) : null}
 
-                    {/* --- LOGIKA BANK (LOGO KECIL) --- */}
+                    {/* BANK (LOGO KECIL) */}
                     {currentMetode.logo && currentMetode.category !== 'E-Wallet' && !currentMetode.nama.includes('QRIS') && (
                          <Image 
                             source={{ uri: `${API_URL}/uploads/logo/${currentMetode.logo}` }} 
@@ -297,7 +295,7 @@ export default function DonasiScreen() {
             </TouchableOpacity>
         </View>
 
-        {/* --- SECTION TRANSPARANSI DONASI --- */}
+        {/* SECTION TRANSPARANSI */}
         <View style={styles.transparencyContainer}>
             <View style={styles.totalCard}>
                 <Text style={styles.totalLabel}>Total Donasi Terkumpul</Text>
@@ -396,7 +394,6 @@ const styles = StyleSheet.create({
   rekNumber: { fontSize: 22, fontWeight: 'bold', color: '#856404', marginVertical: 5 },
   rekName: { fontSize: 14, color: '#856404' },
 
-  // --- STYLE KHUSUS: QRIS FULL BLEED (Melebar ke samping) ---
   qrisWrapper: {
     width: '100%',
     alignItems: 'center',
@@ -404,14 +401,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 10,
     paddingVertical: 20,
-    // Trik Negative Margin agar gambar melebar menutupi padding container induk
-    marginHorizontal: -20, 
+    marginHorizontal: -20, // Style untuk full-width QRIS
     borderWidth: 1,
     borderColor: '#eee',
     elevation: 2
   },
   qrisImage: { 
-    width: 280, // Ukuran Besar Fixed
+    width: 280, 
     height: 280, 
     marginBottom: 10,
     backgroundColor: '#fff'
