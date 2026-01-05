@@ -170,6 +170,7 @@ model users {
   password String @db.VarChar(255)
   bio      String @db.VarChar(255)
   img_url  String @db.VarChar(255)
+  alamat   String @default("-") @db.VarChar(255)
 
   // Role Admin/User (DEFAULT "USER")
   role     String @default("USER") // <--- KOLOM BARU

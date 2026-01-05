@@ -7,9 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
-
-// GANTI IP SESUAI CONFIG KAMU
-const API_URL = 'http://192.168.18.12:3000';
+import { API_URL } from '../constants/Config';
 
 const FORUM_CATEGORIES = [
   'Adoption Stories', 

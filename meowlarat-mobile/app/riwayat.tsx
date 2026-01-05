@@ -8,9 +8,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 import { cat } from '../types';
-
-// GANTI SESUAI CONFIG KAMU
-const API_URL = 'http://192.168.18.12:3000'; 
+import { API_URL } from '../constants/Config';
 
 export default function RiwayatScreen() {
   const router = useRouter();

@@ -8,9 +8,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../constants/Colors';
-
-// ⚠️ PASTIKAN IP INI SESUAI DENGAN BACKEND KAMU
-const API_URL = 'http://192.168.18.12:3000';
+import { API_URL } from '../constants/Config';
 
 const { width } = Dimensions.get('window');
 

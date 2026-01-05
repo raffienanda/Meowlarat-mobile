@@ -6,8 +6,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router'; // TAMBAHKAN useFocusEffect
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
-
-const API_URL = 'http://192.168.18.12:3000'; 
+import { API_URL } from '../constants/Config';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();

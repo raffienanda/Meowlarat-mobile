@@ -5,9 +5,7 @@ import {
 import { WebView } from 'react-native-webview'; 
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
-
-// IP KAMU
-const API_URL = 'http://192.168.18.12:3000'; 
+import { API_URL } from '../constants/Config';
 
 // 1. DEFINISI TIPE DATA (INTERFACE)
 interface PetPlace {

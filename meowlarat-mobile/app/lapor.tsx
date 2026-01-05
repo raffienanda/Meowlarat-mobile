@@ -8,8 +8,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
-
-const API_URL = 'http://192.168.18.12:3000'; 
+import { API_URL } from '../constants/Config';
 
 type AlertType = 'success' | 'error' | 'warning' | 'info';
 

@@ -7,9 +7,7 @@ import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 import RenderHtml from 'react-native-render-html'; // <--- IMPORT LIBRARY HTML
-
-// ⚠️ GANTI IP SESUAI IP LAPTOP KAMU
-const API_URL = 'http://192.168.18.12:3000';
+import { API_URL } from '../constants/Config';
 
 interface Artikel {
   id: number;
@@ -143,7 +141,7 @@ export default function ArtikelScreen() {
   // --- CONFIG HTML RENDERER ---
   // Kamu bisa styling tag HTML spesifik disini
   const tagsStyles = {
-    p: { fontSize: 16, color: '#555', lineHeight: 24, marginBottom: 10, textAlign: 'justify' },
+    p: { fontSize: 16, color: '#555', lineHeight: 24, marginBottom: 10, textAlign: 'justify' as const }, // <--- Fix: Added 'as const'
     h1: { fontSize: 22, color: '#333', marginBottom: 10 },
     h2: { fontSize: 20, color: '#333', marginBottom: 10 },
     li: { fontSize: 16, color: '#555', marginBottom: 5 },

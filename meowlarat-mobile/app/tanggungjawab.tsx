@@ -8,9 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../constants/Colors';
-
-// --- UPDATE IP DISINI SESUAI PERMINTAAN BOS ---
-const API_URL = 'http://192.168.18.12:3000'; 
+import { API_URL } from '../constants/Config';
 
 export default function TanggungJawabScreen() {
   const router = useRouter();

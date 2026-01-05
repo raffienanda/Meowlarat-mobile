@@ -8,9 +8,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons'; 
 import { Colors } from '../constants/Colors';
 import { cat } from '../types';
-
-// GANTI IP SESUAI CONFIG KAMU
-const API_URL = 'http://192.168.18.12:3000';  
+import { API_URL } from '../constants/Config'; 
 
 export default function AdopsiScreen() {
   const router = useRouter();
