@@ -9,13 +9,38 @@ import { Colors } from '../constants/Colors';
 // IP KAMU
 const API_URL = 'http://192.168.18.12:3000'; 
 
+// 1. DEFINISI TIPE DATA (INTERFACE)
+interface PetPlace {
+  id: number;
+  nama: string;
+  category: string;
+  img_url: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  description: string;
+  rating?: number;
+}
+
+interface OnlineShop {
+  id: number;
+  source: string;
+  nama: string;
+  deskripsi: string;
+  link: string;
+  notes?: string;
+}
+
 export default function PetPlaceScreen() {
   const [activeTab, setActiveTab] = useState('offline');
-  const [places, setPlaces] = useState([]);
-  const [onlineShops, setOnlineShops] = useState([]);
+  
+  // 2. PERBAIKAN STATE: Tambahkan Tipe Generik <PetPlace[]> dan <OnlineShop[]>
+  const [places, setPlaces] = useState<PetPlace[]>([]);
+  const [onlineShops, setOnlineShops] = useState<OnlineShop[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const webViewRef = useRef(null);
+  // 3. PERBAIKAN REF: Definisikan sebagai WebView agar method injectJavaScript dikenali
+  const webViewRef = useRef<WebView>(null);
 
   useEffect(() => {
     fetchData();
@@ -24,8 +49,6 @@ export default function PetPlaceScreen() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // console.log("Fetching from:", API_URL); 
-      
       const resOffline = await fetch(`${API_URL}/api/findplace`);
       const dataOffline = await resOffline.json();
       setPlaces(dataOffline);
@@ -42,7 +65,8 @@ export default function PetPlaceScreen() {
     }
   };
 
-  const focusOnMap = (lat, lng) => {
+  // 4. PERBAIKAN PARAMETER: Tambahkan tipe (number, string, dll)
+  const focusOnMap = (lat: number, lng: number) => {
     const runScript = `
       map.setView([${lat}, ${lng}], 16);
       map.eachLayer(function (layer) {
@@ -62,11 +86,11 @@ export default function PetPlaceScreen() {
     }
   };
 
-  const openLink = (url) => {
+  const openLink = (url: string) => {
     if (url) Linking.openURL(url);
   };
 
-  const getMapHTML = (locationsData) => {
+  const getMapHTML = (locationsData: PetPlace[]) => {
     const placesJson = JSON.stringify(locationsData);
     return `
       <!DOCTYPE html>
@@ -104,7 +128,7 @@ export default function PetPlaceScreen() {
     `;
   };
 
-  const renderPlaceItem = ({ item }) => (
+  const renderPlaceItem = ({ item }: { item: PetPlace }) => (
     <TouchableOpacity 
       style={styles.card} 
       onPress={() => focusOnMap(item.latitude, item.longitude)}
@@ -166,14 +190,12 @@ export default function PetPlaceScreen() {
                     ListHeaderComponent={
                         <View style={styles.mapContainer}>
                             {Platform.OS === 'web' ? (
-                                // VERSI WEB: Pakai iframe
                                 <iframe 
                                     srcDoc={getMapHTML(places)}
                                     style={{ width: '100%', height: '100%', border: 'none' }}
                                     title="Map"
                                 />
                             ) : (
-                                // VERSI MOBILE: Pakai WebView
                                 <WebView
                                     ref={webViewRef}
                                     originWhitelist={['*']}
@@ -192,7 +214,7 @@ export default function PetPlaceScreen() {
                 <FlatList
                     data={onlineShops}
                     keyExtractor={(item) => item.id.toString()}
-                    renderItem={({item}) => (
+                    renderItem={({item}: { item: OnlineShop }) => (
                       <TouchableOpacity style={styles.onlineCard} onPress={() => openLink(item.link)}>
                           <View style={[styles.iconBox, { backgroundColor: item.source === 'SHOPEE' ? '#feefe0' : '#e0f2f1' }]}>
                               <Ionicons 
@@ -209,7 +231,7 @@ export default function PetPlaceScreen() {
                           <Ionicons name="open-outline" size={20} color="#ccc" />
                       </TouchableOpacity>
                     )}
-                    contentContainerStyle={{ padding: 15 }} // Ini sudah aman
+                    contentContainerStyle={{ padding: 15 }}
                 />
             )}
         </View>
@@ -234,7 +256,7 @@ const styles = StyleSheet.create({
     width: '100%', 
     borderBottomWidth: 1, 
     borderColor: '#ccc',
-    marginBottom: 20 // 1. Tambah jarak antara Peta dan Kartu pertama
+    marginBottom: 20 
   },
 
   card: { 
@@ -244,7 +266,7 @@ const styles = StyleSheet.create({
     marginBottom: 15, 
     elevation: 2, 
     overflow: 'hidden',
-    marginHorizontal: 20 // 2. Tambah ini agar kartu tidak menempel di pinggir layar
+    marginHorizontal: 20 
   },
   
   cardImage: { width: 150, height: 150, backgroundColor: '#ddd' },
