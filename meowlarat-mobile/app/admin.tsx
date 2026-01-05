@@ -7,8 +7,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // <--- IMPORT INI
-
-const API_URL = 'http://192.168.18.12:3000'; // Pastikan IP sesuai
+import { API_URL } from '../constants/Config';
 
 // --- INTERFACES ---
 interface AdoptionRequest {
