@@ -13,6 +13,19 @@ const API_URL = 'http://192.168.18.12:3000';
 
 type AlertType = 'success' | 'error' | 'warning' | 'info';
 
+// 1. DEFINISI TIPE DATA LAPORAN (INTERFACE)
+interface Laporan {
+  id: number;
+  username: string;
+  judul: string;
+  isi: string;
+  location: string;
+  img_url: string;
+  date: string;
+  status: string;
+  response?: string;
+}
+
 export default function LaporScreen() {
   const router = useRouter();
   
@@ -26,8 +39,8 @@ export default function LaporScreen() {
   const [image, setImage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // STATE FEED
-  const [feedData, setFeedData] = useState([]);
+  // 2. PERBAIKAN STATE: Tambahkan <Laporan[]> agar tidak dianggap never[]
+  const [feedData, setFeedData] = useState<Laporan[]>([]); 
   const [loadingFeed, setLoadingFeed] = useState(false);
 
   // USER SESSION
@@ -49,12 +62,13 @@ export default function LaporScreen() {
     }, [])
   );
 
+  // Fetch data saat tab feed dibuka atau user session berubah
   useFocusEffect(
     useCallback(() => {
-      if (activeTab === 'feed') {
-        fetchAllReports();
+      if (activeTab === 'feed' && userSession) {
+        fetchReportsBasedOnRole();
       }
-    }, [activeTab])
+    }, [activeTab, userSession])
   );
 
   const showAlert = (type: AlertType, title: string, message: string, onPress?: () => void) => {
@@ -78,20 +92,53 @@ export default function LaporScreen() {
       const session = await AsyncStorage.getItem('user_session');
       if (session) {
         const parsed = JSON.parse(session);
-        setUserSession(parsed.user || parsed);
+        // Mengambil data user (username & role)
+        const user = parsed.user || parsed;
+        
+        // Cek jika role tersimpan terpisah (untuk keamanan ganda)
+        const role = await AsyncStorage.getItem('role');
+        if (role) user.role = role;
+
+        setUserSession(user);
       } else {
         showAlert('warning', 'Akses Ditolak', 'Silakan login dulu bos!', () => router.replace('/profil'));
       }
     } catch (e) { console.error(e); }
   };
 
-  const fetchAllReports = async () => {
+  // --- LOGIKA UTAMA: FETCH BERDASARKAN ROLE ---
+  const fetchReportsBasedOnRole = async () => {
+    if (!userSession) return;
+
     setLoadingFeed(true);
     try {
-      const response = await fetch(`${API_URL}/api/lapor/all`);
+      let endpoint = '';
+
+      // JIKA ADMIN -> LIHAT SEMUA (/api/lapor/all)
+      if (userSession.role === 'ADMIN') {
+        endpoint = `${API_URL}/api/lapor/all`;
+      } 
+      // JIKA USER -> LIHAT HISTORY SENDIRI (/api/lapor/history/:username)
+      else {
+        endpoint = `${API_URL}/api/lapor/history/${userSession.username}`;
+      }
+
+      console.log(`Fetching reports for ${userSession.role}: ${endpoint}`); 
+
+      const response = await fetch(endpoint);
       const data = await response.json();
-      setFeedData(data);
-    } catch (e) { console.error(e); } finally { setLoadingFeed(false); }
+      
+      if (Array.isArray(data)) {
+        setFeedData(data); // ERROR HILANG KARENA TIPE DATA SUDAH SESUAI
+      } else {
+        setFeedData([]); 
+      }
+
+    } catch (e) { 
+      console.error(e); 
+    } finally { 
+      setLoadingFeed(false); 
+    }
   };
 
   const pickImage = async () => {
@@ -136,7 +183,7 @@ export default function LaporScreen() {
       const result = await response.json();
       
       if (response.ok) {
-        showAlert('success', 'Laporan Terkirim! 🎉', 'Terima kasih sudah peduli. Laporanmu akan segera dicek admin.', () => {
+        showAlert('success', 'Laporan Terkirim! 🎉', 'Laporanmu akan segera ditinjau oleh Admin.', () => {
             setAlertVisible(false);
             setJudul(''); setIsi(''); setLocation(''); setImage(null);
             setActiveTab('feed'); 
@@ -190,21 +237,23 @@ export default function LaporScreen() {
     </ScrollView>
   );
 
-  // --- RENDERER: FEED ---
+  // --- RENDERER: FEED / HISTORY ---
   const renderFeed = () => (
     <FlatList
         data={feedData}
-        keyExtractor={(item: any) => item.id.toString()}
+        keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={{ padding: 15 }}
-        refreshControl={<RefreshControl refreshing={loadingFeed} onRefresh={fetchAllReports} />}
+        refreshControl={<RefreshControl refreshing={loadingFeed} onRefresh={fetchReportsBasedOnRole} />}
         ListEmptyComponent={
             <View style={{ alignItems: 'center', marginTop: 50 }}>
-                <Ionicons name="newspaper-outline" size={50} color="#ccc" />
-                <Text style={{ color: '#888', marginTop: 10 }}>Belum ada laporan masuk.</Text>
+                <Ionicons name="documents-outline" size={50} color="#ccc" />
+                <Text style={{ color: '#888', marginTop: 10 }}>
+                    {userSession?.role === 'ADMIN' ? 'Belum ada laporan masuk.' : 'Kamu belum pernah melapor.'}
+                </Text>
             </View>
         }
-        renderItem={({ item }: { item: any }) => {
-            // LOGIKA PENENTUAN WARNA STATUS (SYNC DENGAN ADMIN)
+        renderItem={({ item }) => {
+            // LOGIKA PENENTUAN WARNA STATUS
             let statusColor = '#ef6c00'; 
             let statusBg = '#fff3e0';
             let statusText = 'DITINJAU';
@@ -267,8 +316,11 @@ export default function LaporScreen() {
         <TouchableOpacity style={[styles.tabBtn, activeTab === 'form' && styles.tabBtnActive]} onPress={() => setActiveTab('form')}>
             <Text style={[styles.tabText, activeTab === 'form' && styles.tabTextActive]}>Buat Laporan</Text>
         </TouchableOpacity>
+        
         <TouchableOpacity style={[styles.tabBtn, activeTab === 'feed' && styles.tabBtnActive]} onPress={() => setActiveTab('feed')}>
-            <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive]}>Semua Laporan</Text>
+            <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive]}>
+                {userSession?.role === 'ADMIN' ? 'Semua Laporan' : 'Riwayat Saya'}
+            </Text>
         </TouchableOpacity>
       </View>
 

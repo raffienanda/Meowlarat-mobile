@@ -112,7 +112,7 @@ export default function BerandaScreen() {
             <Text style={styles.sectionTitle}>Layanan Kami</Text>
             <View style={styles.menuGrid}>
                 
-                {/* 1. Donasi (SEKARANG BUTUH LOGIN) */}
+                {/* 1. Donasi */}
                 <MenuIcon 
                   icon="heart" 
                   label="Donasi" 
@@ -120,7 +120,7 @@ export default function BerandaScreen() {
                   onPress={() => handleProtectedPress('/donasi')} 
                 />
 
-                {/* 2. Artikel (Bebas Akses) */}
+                {/* 2. Artikel */}
                 <MenuIcon 
                   icon="book" 
                   label="Cat Pedia" 
@@ -128,7 +128,7 @@ export default function BerandaScreen() {
                   onPress={() => router.push('/artikel')} 
                 />
 
-                {/* 3. Pet Place (Bebas Akses) */}
+                {/* 3. Pet Place */}
                 <MenuIcon 
                   icon="map" 
                   label="Pet Place" 
@@ -136,12 +136,20 @@ export default function BerandaScreen() {
                   onPress={() => router.push('/petplace')} 
                 />
                 
-                {/* 4. Riwayat (Butuh Login) */}
+                {/* 4. Riwayat Adopsi */}
                 <MenuIcon 
                   icon="time" 
-                  label="Riwayat Adopsi" 
+                  label="Adopsiku" 
                   color="#a55eea" 
                   onPress={() => handleProtectedPress('/riwayat')} 
+                />
+
+                {/* 5. MENU BARU: RIWAYAT LAPORAN */}
+                <MenuIcon 
+                  icon="document-text" 
+                  label="Laporan" 
+                  color="#ff9f43" 
+                  onPress={() => handleProtectedPress('/lapor')} 
                 />
 
             </View>
@@ -231,8 +239,23 @@ const styles = StyleSheet.create({
 
   menuContainer: { padding: 20 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text, marginBottom: 15 },
-  menuGrid: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  menuItem: { alignItems: 'center', width: '22%' },
+  
+  // PERBAIKAN GRID: Tambahkan flexWrap agar ikon ke-5 turun ke bawah
+  menuGrid: { 
+    flexDirection: 'row', 
+    justifyContent: 'flex-start', // Ubah jadi flex-start agar rapi saat wrap
+    alignItems: 'flex-start',
+    flexWrap: 'wrap', 
+    gap: 15 // Jarak antar item
+  },
+  
+  // PERBAIKAN ITEM: Set lebar dinamis (sekitar 20% layar)
+  menuItem: { 
+    alignItems: 'center', 
+    width: (width - 40 - (15 * 3)) / 4, // Hitungan manual agar pas 4 kolom
+    marginBottom: 15
+  },
+  
   iconCircle: { width: 55, height: 55, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 5, elevation: 3 },
   menuLabel: { fontSize: 11, color: Colors.text, textAlign: 'center' },
 

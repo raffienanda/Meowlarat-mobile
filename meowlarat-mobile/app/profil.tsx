@@ -42,7 +42,6 @@ export default function ProfilScreen() {
         setUserData(session.user || session); 
         setIsLoggedIn(true);
 
-        // Update data terbaru dari server (termasuk cek apakah role berubah)
         try {
             const response = await fetch(`${API_URL}/api/auth/me`, {
                 method: 'GET',
@@ -51,10 +50,8 @@ export default function ProfilScreen() {
             const newData = await response.json();
             if (response.ok) {
                 setUserData(newData); 
-                // Update session & role
                 const newSession = { token: token, user: newData };
                 await AsyncStorage.setItem('user_session', JSON.stringify(newSession));
-                // Pastikan role tersimpan juga biar aman
                 if (newData.role) await AsyncStorage.setItem('role', newData.role);
             }
         } catch (err) {
@@ -83,23 +80,17 @@ export default function ProfilScreen() {
       const result = await response.json();
 
       if (response.ok) {
-        // 1. Simpan Session
         const sessionData = { token: result.token, user: result.user };
         await AsyncStorage.setItem('user_session', JSON.stringify(sessionData));
-        
-        // 2. SIMPAN ROLE (PENTING BUAT ADMIN)
         await AsyncStorage.setItem('role', result.user.role);
 
         setUserData(sessionData.user);
         setIsLoggedIn(true);
-        
         Alert.alert("Berhasil", "Selamat datang kembali!");
 
-        // 3. LOGIC REDIRECT ADMIN
         if (result.user.role === 'ADMIN') {
-           router.replace('/admin'); // Pindah ke halaman admin
+           router.replace('/admin'); 
         }
-
       } else {
         Alert.alert("Gagal", result.message || "Login gagal");
       }
@@ -113,7 +104,7 @@ export default function ProfilScreen() {
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem('user_session');
-      await AsyncStorage.removeItem('role'); // Hapus role juga
+      await AsyncStorage.removeItem('role'); 
       setIsLoggedIn(false);
       setUserData(null);
       setUsername('');
@@ -133,7 +124,6 @@ export default function ProfilScreen() {
           <Text style={styles.title}>Masuk Meowlarat</Text>
           <Text style={styles.subtitle}>Kelola adopsi dan pantau kucingmu</Text>
 
-          {/* INPUT USERNAME */}
           <View style={styles.inputContainer}>
             <Ionicons name="person-outline" size={20} color="#666" style={styles.icon} />
             <TextInput 
@@ -146,7 +136,6 @@ export default function ProfilScreen() {
             />
           </View>
 
-          {/* INPUT PASSWORD */}
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.icon} />
             <TextInput 
@@ -200,7 +189,6 @@ export default function ProfilScreen() {
           <Text style={styles.userName}>{userData?.nama || userData?.username}</Text>
           <Text style={styles.userBio}>{userData?.bio || "Pecinta Kucing Sejati"}</Text>
           
-          {/* BADGE ADMIN JIKA LOGIN SEBAGAI ADMIN */}
           {userData?.role === 'ADMIN' && (
             <View style={{ backgroundColor: '#e3f2fd', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, marginTop: 5 }}>
                 <Text style={{ color: Colors.primary, fontWeight: 'bold', fontSize: 12 }}>ADMINISTRATOR</Text>
@@ -209,7 +197,6 @@ export default function ProfilScreen() {
         </View>
 
         <View style={styles.menuSection}>
-          {/* MENU KHUSUS ADMIN */}
           {userData?.role === 'ADMIN' && (
              <MenuItem 
                icon="shield-checkmark" 
@@ -223,6 +210,14 @@ export default function ProfilScreen() {
             text="Riwayat Adopsi Saya" 
             onPress={() => router.push('/riwayat')} 
           />
+
+          {/* MENU BARU: RIWAYAT LAPORAN */}
+          <MenuItem 
+            icon="document-text" 
+            text="Riwayat Laporan Saya" 
+            onPress={() => router.push('/lapor')} 
+          />
+
           <MenuItem icon="heart" text="Donasi Saya" onPress={() => router.push('/donasi')} />
           
           <MenuItem 
@@ -240,7 +235,6 @@ export default function ProfilScreen() {
   );
 }
 
-// Komponen Menu Helper
 const MenuItem = ({ icon, text, onPress }: { icon: any, text: string, onPress?: () => void }) => (
   <TouchableOpacity style={styles.menuItem} onPress={onPress}>
     <Ionicons name={icon} size={24} color={Colors.primary} />
@@ -258,9 +252,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 40 },
   inputContainer: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: '#ccc', marginBottom: 20, paddingBottom: 5 },
   icon: { marginRight: 10 },
-  
   input: { flex: 1, fontSize: 16, paddingVertical: 8, color: '#333' },
-
   registerContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
   linkText: { color: Colors.primary, fontWeight: 'bold' },
   profileContent: { padding: 20, alignItems: 'center' },
