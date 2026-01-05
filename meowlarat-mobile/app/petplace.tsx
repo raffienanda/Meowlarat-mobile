@@ -2,12 +2,12 @@ import React, { useEffect, useState, useRef } from 'react';
 import { 
   StyleSheet, View, Text, FlatList, TouchableOpacity, Linking, SafeAreaView, Image, ActivityIndicator, Alert, Platform
 } from 'react-native';
-import { WebView } from 'react-native-webview'; // Jembatan ke Leaflet
+import { WebView } from 'react-native-webview'; 
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 
-// IP KAMU: JANGAN PAKAI 'localhost'. 
-const API_URL = 'http://192.168.0.142:3000'; 
+// IP KAMU
+const API_URL = 'http://192.168.18.12:3000'; 
 
 export default function PetPlaceScreen() {
   const [activeTab, setActiveTab] = useState('offline');
@@ -15,7 +15,6 @@ export default function PetPlaceScreen() {
   const [onlineShops, setOnlineShops] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Ref untuk mengontrol WebView dari luar
   const webViewRef = useRef(null);
 
   useEffect(() => {
@@ -25,7 +24,7 @@ export default function PetPlaceScreen() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      console.log("Fetching from:", API_URL); // Debugging URL
+      // console.log("Fetching from:", API_URL); 
       
       const resOffline = await fetch(`${API_URL}/api/findplace`);
       const dataOffline = await resOffline.json();
@@ -43,29 +42,19 @@ export default function PetPlaceScreen() {
     }
   };
 
-  // --- FUNGSI UTAMA: PINDAHKAN KAMERA MAP ---
   const focusOnMap = (lat, lng) => {
-    // Scroll ke atas agar peta terlihat
-    // (Opsional, tergantung UX yang dimau)
-    
-    // Script JavaScript yang akan ditembakkan ke dalam WebView
     const runScript = `
-      // Pindahkan view
       map.setView([${lat}, ${lng}], 16);
-      
-      // Cari marker yang sesuai dan buka popup-nya
       map.eachLayer(function (layer) {
         if (layer instanceof L.Marker) {
            var position = layer.getLatLng();
-           // Bandingkan float dengan toleransi kecil atau exact match
            if (Math.abs(position.lat - ${lat}) < 0.00001 && Math.abs(position.lng - ${lng}) < 0.00001) {
              layer.openPopup();
            }
         }
       });
-      true; // Wajib diakhiri true untuk iOS
+      true;
     `;
-
     if (webViewRef.current) {
         webViewRef.current.injectJavaScript(runScript);
     } else {
@@ -77,7 +66,6 @@ export default function PetPlaceScreen() {
     if (url) Linking.openURL(url);
   };
 
-  // --- HTML GENERATOR (Sama seperti sebelumnya, tapi CSS disesuaikan) ---
   const getMapHTML = (locationsData) => {
     const placesJson = JSON.stringify(locationsData);
     return `
@@ -96,16 +84,12 @@ export default function PetPlaceScreen() {
           <div id="map"></div>
           <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
           <script>
-              // Inisialisasi Peta
-              var map = L.map('map').setView([-6.9175, 107.6191], 11); // Default view
-              
+              var map = L.map('map').setView([-6.9175, 107.6191], 11);
               L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
                   maxZoom: 19, attribution: '© OpenStreetMap'
               }).addTo(map);
 
               var places = ${placesJson};
-              
-              // Load Marker dari Database
               if(Array.isArray(places)) {
                 places.forEach(function(place) {
                     if(place.latitude && place.longitude) {
@@ -120,11 +104,10 @@ export default function PetPlaceScreen() {
     `;
   };
 
-  // --- RENDER CARD LOKASI ---
   const renderPlaceItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.card} 
-      onPress={() => focusOnMap(item.latitude, item.longitude)} // <--- AKSI KLIK DISINI
+      onPress={() => focusOnMap(item.latitude, item.longitude)}
     >
       <Image 
         source={{ uri: `${API_URL}/uploads/img-petplace/${item.img_url}` }} 
@@ -143,9 +126,9 @@ export default function PetPlaceScreen() {
 
         <Text style={styles.placeName}>{item.nama}</Text>
         <Text style={styles.placeAddress} numberOfLines={2}>{item.address}</Text>
+        <Text style={styles.onlineDesc}>{item.description}</Text>
         
         <View style={styles.actionRow}>
-            {/* Indikator Tombol */}
             <View style={styles.btnSimulasi}>
                 <Ionicons name="locate" size={12} color="#fff" />
                 <Text style={{color:'#fff', fontSize:10, marginLeft:4}}>Lihat di Peta</Text>
@@ -157,7 +140,6 @@ export default function PetPlaceScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header & Tabs */}
       <View style={styles.header}>
         <Text style={styles.title}>Cari Pet Place 🏥</Text>
         <Text style={styles.subtitle}>Temukan kebutuhan anabulmu</Text>
@@ -165,19 +147,17 @@ export default function PetPlaceScreen() {
 
       <View style={styles.tabContainer}>
         <TouchableOpacity style={[styles.tabBtn, activeTab === 'offline' && styles.tabBtnActive]} onPress={() => setActiveTab('offline')}>
-            <Text style={[styles.tabText, activeTab === 'offline' && styles.tabTextActive]}>Terdekat (Peta)</Text>
+            <Text style={[styles.tabText, activeTab === 'offline' && styles.tabTextActive]}>Vet & Petshop</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tabBtn, activeTab === 'online' && styles.tabBtnActive]} onPress={() => setActiveTab('online')}>
             <Text style={[styles.tabText, activeTab === 'online' && styles.tabTextActive]}>Toko Online</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Main Content */}
       {loading ? (
         <ActivityIndicator size="large" color={Colors.primary} style={{marginTop: 50}} />
       ) : (
         <View style={{flex: 1}}>
-            {/* LOGIC TAMPILAN MAP */}
             {activeTab === 'offline' && (
                 <FlatList
                     data={places}
@@ -186,8 +166,14 @@ export default function PetPlaceScreen() {
                     ListHeaderComponent={
                         <View style={styles.mapContainer}>
                             {Platform.OS === 'web' ? (
-                                <Text style={{ padding: 20, textAlign: 'center' }}>Map not supported on Web Preview</Text>
+                                // VERSI WEB: Pakai iframe
+                                <iframe 
+                                    srcDoc={getMapHTML(places)}
+                                    style={{ width: '100%', height: '100%', border: 'none' }}
+                                    title="Map"
+                                />
                             ) : (
+                                // VERSI MOBILE: Pakai WebView
                                 <WebView
                                     ref={webViewRef}
                                     originWhitelist={['*']}
@@ -202,24 +188,28 @@ export default function PetPlaceScreen() {
                 />
             )}
 
-
-            {/* LOGIC TAMPILAN ONLINE */}
             {activeTab === 'online' && (
                 <FlatList
                     data={onlineShops}
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={({item}) => (
-                        <TouchableOpacity style={styles.onlineCard} onPress={() => openLink(item.link)}>
-                             <View style={[styles.iconBox, { backgroundColor: item.source === 'SHOPEE' ? '#feefe0' : '#e0f2f1' }]}>
-                                <Ionicons name={item.source === 'SHOPEE' ? "bag-handle" : "cart"} size={24} color={item.source === 'SHOPEE' ? '#ee4d2d' : '#03ac0e'} />
-                            </View>
-                            <View style={{flex: 1}}>
-                                <Text style={styles.onlineName}>{item.nama}</Text>
-                                <Text style={styles.onlineDesc}>{item.deskripsi}</Text>
-                            </View>
-                        </TouchableOpacity>
+                      <TouchableOpacity style={styles.onlineCard} onPress={() => openLink(item.link)}>
+                          <View style={[styles.iconBox, { backgroundColor: item.source === 'SHOPEE' ? '#feefe0' : '#e0f2f1' }]}>
+                              <Ionicons 
+                                  name={item.source === 'SHOPEE' ? "bag-handle" : "cart"} 
+                                  size={35} 
+                                  color={item.source === 'SHOPEE' ? '#ee4d2d' : '#03ac0e'} 
+                              />
+                          </View>
+                          <View style={{flex: 1}}>
+                              <Text style={styles.onlineName}>{item.nama}</Text>
+                              <Text style={styles.onlineDesc}>{item.deskripsi}</Text>
+                              {item.notes && <Text style={styles.onlineNote}>Promo: {item.notes}</Text>}
+                          </View>
+                          <Ionicons name="open-outline" size={20} color="#ccc" />
+                      </TouchableOpacity>
                     )}
-                    contentContainerStyle={{ padding: 15 }}
+                    contentContainerStyle={{ padding: 15 }} // Ini sudah aman
                 />
             )}
         </View>
@@ -239,20 +229,37 @@ const styles = StyleSheet.create({
   tabText: { color: '#666', fontWeight: 'bold' },
   tabTextActive: { color: '#fff' },
   
-  mapContainer: { height: 300, width: '100%', borderBottomWidth: 1, borderColor: '#ccc' },
+  mapContainer: { 
+    height: 400, 
+    width: '100%', 
+    borderBottomWidth: 1, 
+    borderColor: '#ccc',
+    marginBottom: 20 // 1. Tambah jarak antara Peta dan Kartu pertama
+  },
 
-  card: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, marginBottom: 15, elevation: 2, overflow: 'hidden' },
-  cardImage: { width: 100, height: 130, backgroundColor: '#ddd' },
+  card: { 
+    flexDirection: 'row', 
+    backgroundColor: '#fff', 
+    borderRadius: 12, 
+    marginBottom: 15, 
+    elevation: 2, 
+    overflow: 'hidden',
+    marginHorizontal: 20 // 2. Tambah ini agar kartu tidak menempel di pinggir layar
+  },
+  
+  cardImage: { width: 150, height: 150, backgroundColor: '#ddd' },
   cardContent: { flex: 1, padding: 12, justifyContent: 'center' },
   badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   badgeText: { fontSize: 10, fontWeight: 'bold' },
   placeName: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 2 },
   placeAddress: { fontSize: 12, color: '#666', marginBottom: 8 },
+  placeDesc: { fontSize: 12, color: '#555', marginBottom: 8 },
   actionRow: { flexDirection: 'row', marginTop: 5 },
   btnSimulasi: { flexDirection:'row', backgroundColor: Colors.primary || '#002b5b', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignItems:'center' },
   
   onlineCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 15, borderRadius: 12, marginBottom: 10, elevation: 2, marginHorizontal: 15 },
-  iconBox: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  iconBox: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
   onlineName: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  onlineDesc: { fontSize: 12, color: '#666' },
+  onlineDesc: { fontSize: 14, color: '#666' },
+  onlineNote: { fontSize: 12, color: '#ef6c00', marginTop: 4, fontStyle: 'italic' },
 });
