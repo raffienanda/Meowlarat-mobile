@@ -7,38 +7,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 import { API_URL } from '../constants/Config';
 
-// 1. DEFINISI TIPE DATA (INTERFACE)
-interface PetPlace {
-  id: number;
-  nama: string;
-  category: string;
-  img_url: string;
-  address: string;
-  latitude: number;
-  longitude: number;
-  description: string;
-  rating?: number;
-}
-
-interface OnlineShop {
-  id: number;
-  source: string;
-  nama: string;
-  deskripsi: string;
-  link: string;
-  notes?: string;
-}
-
 export default function PetPlaceScreen() {
   const [activeTab, setActiveTab] = useState('offline');
-  
-  // 2. PERBAIKAN STATE: Tambahkan Tipe Generik <PetPlace[]> dan <OnlineShop[]>
-  const [places, setPlaces] = useState<PetPlace[]>([]);
-  const [onlineShops, setOnlineShops] = useState<OnlineShop[]>([]);
+  const [places, setPlaces] = useState([]);
+  const [onlineShops, setOnlineShops] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // 3. PERBAIKAN REF: Definisikan sebagai WebView agar method injectJavaScript dikenali
-  const webViewRef = useRef<WebView>(null);
+  // 1. BUAT REF UNTUK FLATLIST DAN WEBVIEW
+  const webViewRef = useRef(null);
+  const flatListRef = useRef(null); // <--- Tambahan Baru
 
   useEffect(() => {
     fetchData();
@@ -63,8 +40,13 @@ export default function PetPlaceScreen() {
     }
   };
 
-  // 4. PERBAIKAN PARAMETER: Tambahkan tipe (number, string, dll)
-  const focusOnMap = (lat: number, lng: number) => {
+  const focusOnMap = (lat, lng) => {
+    // 2. LOGIKA SCROLL KE ATAS (MAP)
+    if (flatListRef.current) {
+        flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+    }
+
+    // Logika Pindah Marker (Leaflet)
     const runScript = `
       map.setView([${lat}, ${lng}], 16);
       map.eachLayer(function (layer) {
@@ -77,18 +59,23 @@ export default function PetPlaceScreen() {
       });
       true;
     `;
-    if (webViewRef.current) {
-        webViewRef.current.injectJavaScript(runScript);
-    } else {
-        Alert.alert("Info", "Peta belum siap");
-    }
+    
+    // Kasih delay dikit biar scroll selesai dulu baru peta gerak (opsional, biar smooth)
+    setTimeout(() => {
+        if (webViewRef.current) {
+            webViewRef.current.injectJavaScript(runScript);
+        } else {
+            // Alert.alert("Info", "Peta belum siap"); 
+            // Dicomment aja biar gak ganggu kalau loading
+        }
+    }, 300);
   };
 
-  const openLink = (url: string) => {
+  const openLink = (url) => {
     if (url) Linking.openURL(url);
   };
 
-  const getMapHTML = (locationsData: PetPlace[]) => {
+  const getMapHTML = (locationsData) => {
     const placesJson = JSON.stringify(locationsData);
     return `
       <!DOCTYPE html>
@@ -126,7 +113,7 @@ export default function PetPlaceScreen() {
     `;
   };
 
-  const renderPlaceItem = ({ item }: { item: PetPlace }) => (
+  const renderPlaceItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.card} 
       onPress={() => focusOnMap(item.latitude, item.longitude)}
@@ -148,7 +135,8 @@ export default function PetPlaceScreen() {
 
         <Text style={styles.placeName}>{item.nama}</Text>
         <Text style={styles.placeAddress} numberOfLines={2}>{item.address}</Text>
-        <Text style={styles.onlineDesc}>{item.description}</Text>
+        {/* Perbaikan kecil: Pastikan key description ada, atau gunakan deskripsi */}
+        <Text style={styles.placeDesc} numberOfLines={2}>{item.description || item.deskripsi}</Text>
         
         <View style={styles.actionRow}>
             <View style={styles.btnSimulasi}>
@@ -182,6 +170,7 @@ export default function PetPlaceScreen() {
         <View style={{flex: 1}}>
             {activeTab === 'offline' && (
                 <FlatList
+                    ref={flatListRef} // 3. PASANG REF DISINI
                     data={places}
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={renderPlaceItem}
@@ -212,7 +201,7 @@ export default function PetPlaceScreen() {
                 <FlatList
                     data={onlineShops}
                     keyExtractor={(item) => item.id.toString()}
-                    renderItem={({item}: { item: OnlineShop }) => (
+                    renderItem={({item}) => (
                       <TouchableOpacity style={styles.onlineCard} onPress={() => openLink(item.link)}>
                           <View style={[styles.iconBox, { backgroundColor: item.source === 'SHOPEE' ? '#feefe0' : '#e0f2f1' }]}>
                               <Ionicons 
@@ -229,7 +218,7 @@ export default function PetPlaceScreen() {
                           <Ionicons name="open-outline" size={20} color="#ccc" />
                       </TouchableOpacity>
                     )}
-                    contentContainerStyle={{ padding: 15 }}
+                    contentContainerStyle={{ padding: 15 }} 
                 />
             )}
         </View>
@@ -267,18 +256,18 @@ const styles = StyleSheet.create({
     marginHorizontal: 20 
   },
   
-  cardImage: { width: 150, height: 150, backgroundColor: '#ddd' },
+  cardImage: { width: 140, height: 140, backgroundColor: '#ddd' }, // Sedikit disesuaikan biar gak gepeng
   cardContent: { flex: 1, padding: 12, justifyContent: 'center' },
   badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   badgeText: { fontSize: 10, fontWeight: 'bold' },
   placeName: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 2 },
-  placeAddress: { fontSize: 12, color: '#666', marginBottom: 8 },
-  placeDesc: { fontSize: 12, color: '#555', marginBottom: 8 },
+  placeAddress: { fontSize: 12, color: '#666', marginBottom: 4 },
+  placeDesc: { fontSize: 11, color: '#888', marginBottom: 8 }, // Style tambahan buat deskripsi
   actionRow: { flexDirection: 'row', marginTop: 5 },
   btnSimulasi: { flexDirection:'row', backgroundColor: Colors.primary || '#002b5b', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignItems:'center' },
   
   onlineCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 15, borderRadius: 12, marginBottom: 10, elevation: 2, marginHorizontal: 15 },
-  iconBox: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  iconBox: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginRight: 15 }, // Dikecilin dikit biar proporsional
   onlineName: { fontSize: 16, fontWeight: 'bold', color: '#333' },
   onlineDesc: { fontSize: 14, color: '#666' },
   onlineNote: { fontSize: 12, color: '#ef6c00', marginTop: 4, fontStyle: 'italic' },

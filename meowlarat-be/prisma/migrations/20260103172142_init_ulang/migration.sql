@@ -88,7 +88,6 @@ CREATE TABLE "petplace" (
     "address" TEXT NOT NULL,
     "latitude" DOUBLE PRECISION NOT NULL,
     "longitude" DOUBLE PRECISION NOT NULL,
-    "rating" INTEGER NOT NULL DEFAULT 5,
     "description" TEXT,
 
     CONSTRAINT "petplace_pkey" PRIMARY KEY ("id")

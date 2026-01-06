@@ -76,7 +76,6 @@ export interface petplace {
   address: string;
   latitude: number;
   longitude: number;
-  rating: number;
   description: string | null;
 }
 

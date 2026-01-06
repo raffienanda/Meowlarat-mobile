@@ -52,8 +52,8 @@ async function main() {
   // --- DATA KUCING, LOKASI, DLL (BAWAAN SEED LAMA) ---
   await prisma.petplace.createMany({
     data: [
-      { nama: "Meow City Petshop", category: "Petshop", img_url: "petshop3.png", address: "Jl. Ir. H. Juanda No. 100, Dago", latitude: -6.8858, longitude: 107.6143, rating: 5, description: "Menyediakan makanan premium." },
-      { nama: "Klinik Hewan Sehat", category: "Vet", img_url: "vet1.png", address: "Jl. Sunda No. 55, Bandung", latitude: -6.9175, longitude: 107.6191, rating: 5, description: "Dokter hewan 24 jam." }
+      { nama: "Meow City Petshop", category: "Petshop", img_url: "petshop3.png", address: "Jl. Ir. H. Juanda No. 100, Dago", latitude: -6.8858, longitude: 107.6143, description: "Menyediakan makanan premium." },
+      { nama: "Klinik Hewan Sehat", category: "Vet", img_url: "vet1.png", address: "Jl. Sunda No. 55, Bandung", latitude: -6.9175, longitude: 107.6191, description: "Dokter hewan 24 jam." }
     ]
   });
 
