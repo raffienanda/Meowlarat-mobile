@@ -18,7 +18,7 @@ if (!fs.existsSync(uploadDir)) {
 
 async function donasiRoutes(fastify, options) {
   
-  // === TAMBAHKAN CODE INI (GET Route) ===
+  // 1. GET SEMUA DONASI (Untuk Tab "Semua")
   fastify.get('/', async (request, reply) => {
     try {
       // Ambil data donasi dari database, urutkan dari yang terbaru
@@ -42,8 +42,31 @@ async function donasiRoutes(fastify, options) {
       return reply.code(500).send({ message: 'Gagal mengambil data donasi' });
     }
   });
-  // ========================================
 
+  // 2. GET RIWAYAT DONASI USER (BARU: Untuk Tab "Saya")
+  // Endpoint ini yang sebelumnya hilang, makanya riwayat tidak tampil.
+  fastify.get('/history/:username', async (request, reply) => {
+    const { username } = request.params;
+    try {
+      const listDonasi = await prisma.donasi.findMany({
+        where: { username: username }, // Filter khusus user ini
+        orderBy: { id: 'desc' },
+        include: {
+          metode_donasi_metodeTometode: true
+        }
+      });
+
+      return reply.send({ 
+        status: 'success', 
+        data: listDonasi 
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ message: 'Gagal mengambil riwayat donasi user' });
+    }
+  });
+
+  // 3. POST DONASI BARU
   fastify.post('/', async (request, reply) => {
     try {
       const parts = request.parts();
@@ -71,7 +94,8 @@ async function donasiRoutes(fastify, options) {
           pesan: fields.pesan || '-',
           metode: metodeInt,
           username: fields.username, 
-          bukti_transfer: fileName 
+          bukti_transfer: fileName,
+          status: 'PENDING' // Default status biar user tau donasinya belum diverifikasi
         }
       });
 

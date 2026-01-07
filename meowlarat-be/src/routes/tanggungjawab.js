@@ -9,6 +9,7 @@ const prisma = new PrismaClient();
 
 async function tanggungJawabRoutes(fastify, options) {
   
+  // 1. UPLOAD / UPDATE LAPORAN
   fastify.post('/', {
     onRequest: [async (request) => await request.jwtVerify()]
   }, async (request, reply) => {
@@ -47,14 +48,13 @@ async function tanggungJawabRoutes(fastify, options) {
 
         } else {
           // --- HANDLER FIELD (Text) ---
-          // part.value kadang terpotong di versi lama, tapi biasanya aman untuk ID pendek
           if (part.fieldname === 'cat_id') cat_id = parseInt(part.value);
           if (part.fieldname === 'week') week = parseInt(part.value);
         }
       }
 
       // 3. Validasi Data
-      console.log(`Debug Upload: CatID=${cat_id}, Week=${week}`); // Cek di terminal server
+      console.log(`Debug Upload TJ: CatID=${cat_id}, Week=${week}`);
       
       if (!cat_id || isNaN(cat_id) || !week || isNaN(week)) {
           return reply.code(400).send({ message: 'Data cat_id atau week tidak valid/kosong.' });
@@ -105,18 +105,19 @@ async function tanggungJawabRoutes(fastify, options) {
       return { message: `Laporan Minggu ${week} berhasil disimpan`, data: laporan };
 
     } catch (error) {
-      console.error("Error Saving Report:", error);
+      console.error("Error Saving TJ Report:", error);
       return reply.code(500).send({ message: 'Internal Server Error', error: error.message });
     }
   });
 
-  // GET Route tetap sama...
+  // 2. GET STATUS LAPORAN (Untuk Indikator Selesai)
   fastify.get('/:catId', async (request, reply) => {
     const { catId } = request.params;
     try {
       const report = await prisma.tanggungjawab.findFirst({
         where: { id_cat: parseInt(catId) }
       });
+      // Mengembalikan objek kosong jika belum ada, agar frontend tidak error null
       return report || {};
     } catch (error) {
       return reply.code(500).send({ message: 'Error mengambil data' });

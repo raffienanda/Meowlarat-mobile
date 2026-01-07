@@ -153,8 +153,9 @@ export default function LaporScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!judul || !isi || !location) {
-      showAlert('error', 'Data Belum Lengkap', 'Mohon isi Judul, Lokasi, dan Detail laporan.');
+    // --- MODIFIKASI: VALIDASI GAMBAR (IMAGE) DITAMBAHKAN DI SINI ---
+    if (!judul || !isi || !location || !image) {
+      showAlert('error', 'Data Belum Lengkap', 'Mohon isi Judul, Lokasi, Detail, dan lampirkan Foto Bukti.');
       return;
     }
     

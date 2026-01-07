@@ -30,6 +30,11 @@ async function laporRoutes(fastify, options) {
         }
       }
 
+      // --- MODIFIKASI: CEK JIKA FILE TIDAK DIUPLOAD ---
+      if (!uploadedFileName) {
+        return reply.code(400).send({ message: 'Gagal: Bukti foto wajib disertakan!' });
+      }
+
       // PERBAIKAN: Pakai 'prisma.laporan' (sesuai nama tabelmu)
       const newReport = await prisma.laporan.create({
         data: {
@@ -37,7 +42,7 @@ async function laporRoutes(fastify, options) {
           judul: body.judul,
           isi: body.isi,
           location: body.location || "-",
-          img_url: uploadedFileName || "default-lapor.png",
+          img_url: uploadedFileName, // Hapus fallback default, karena sekarang wajib
           date: new Date(),
           status: 'PENDING', 
           response: '-'

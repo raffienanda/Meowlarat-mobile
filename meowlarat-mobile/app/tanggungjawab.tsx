@@ -26,6 +26,8 @@ export default function TanggungJawabScreen() {
 
   // State untuk menyimpan data laporan dari Server
   const [serverReport, setServerReport] = useState<any>(null);
+  // State Status Pengerjaan (Baru)
+  const [isDone, setIsDone] = useState(false);
 
   // State 3 Foto (Preview)
   const [imgMakanan, setImgMakanan] = useState<string | null>(null);
@@ -77,12 +79,13 @@ export default function TanggungJawabScreen() {
     }
   };
 
-  // --- 3. LOGIKA TAMPILKAN GAMBAR BERDASARKAN MINGGU ---
+  // --- 3. LOGIKA TAMPILKAN GAMBAR & STATUS SELESAI ---
   useEffect(() => {
-    // Reset gambar dulu setiap ganti minggu
+    // Reset gambar & status setiap ganti minggu
     setImgMakanan(null);
     setImgAktivitas(null);
     setImgKotoran(null);
+    setIsDone(false);
 
     if (!week || week === 'Selesai' || !serverReport) return;
 
@@ -92,27 +95,41 @@ export default function TanggungJawabScreen() {
     const getUrl = (filename: string | null) => 
         filename ? `${API_URL}/uploads/img-tanggungjawab/${filename}` : null;
 
-    // Cek data dari server, kalau ada filenya, tampilkan!
+    // Cek data dari server
+    let m = null, a = null, k = null;
+
     if (w === 1) {
-        if (serverReport.gambarmakanan1) setImgMakanan(getUrl(serverReport.gambarmakanan1));
-        if (serverReport.gambaraktivitas1) setImgAktivitas(getUrl(serverReport.gambaraktivitas1));
-        if (serverReport.gambarkotoran1) setImgKotoran(getUrl(serverReport.gambarkotoran1));
+        m = serverReport.gambarmakanan1;
+        a = serverReport.gambaraktivitas1;
+        k = serverReport.gambarkotoran1;
     } else if (w === 2) {
-        if (serverReport.gambarmakanan2) setImgMakanan(getUrl(serverReport.gambarmakanan2));
-        if (serverReport.gambaraktivitas2) setImgAktivitas(getUrl(serverReport.gambaraktivitas2));
-        if (serverReport.gambarkotoran2) setImgKotoran(getUrl(serverReport.gambarkotoran2));
+        m = serverReport.gambarmakanan2;
+        a = serverReport.gambaraktivitas2;
+        k = serverReport.gambarkotoran2;
     } else if (w === 3) {
-        if (serverReport.gambarmakanan3) setImgMakanan(getUrl(serverReport.gambarmakanan3));
-        if (serverReport.gambaraktivitas3) setImgAktivitas(getUrl(serverReport.gambaraktivitas3));
-        if (serverReport.gambarkotoran3) setImgKotoran(getUrl(serverReport.gambarkotoran3));
+        m = serverReport.gambarmakanan3;
+        a = serverReport.gambaraktivitas3;
+        k = serverReport.gambarkotoran3;
     }
+
+    // Set Image URL ke State
+    if (m) setImgMakanan(getUrl(m));
+    if (a) setImgAktivitas(getUrl(a));
+    if (k) setImgKotoran(getUrl(k));
+
+    // --- LOGIKA INDIKATOR SELESAI ---
+    // Jika ketiga foto sudah ada di server, tandai sebagai selesai
+    if (m && a && k) {
+        setIsDone(true);
+    }
+
   }, [week, serverReport]);
 
 
   // --- PILIH FOTO DARI GALERI ---
   const pickImage = async (type: 'makanan' | 'aktivitas' | 'kotoran') => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.5,
@@ -259,7 +276,18 @@ export default function TanggungJawabScreen() {
                 <Text style={styles.finishedSub}>Terima kasih sudah merawatnya.</Text>
             </View>
         ) : (
-            <>
+            <>  
+                {/* --- INDIKATOR SUDAH SELESAI --- */}
+                {isDone && (
+                    <View style={styles.doneBanner}>
+                        <Ionicons name="checkmark-done-circle" size={32} color="#fff" />
+                        <View style={{marginLeft: 10, flex: 1}}>
+                            <Text style={styles.doneTitle}>Laporan Lengkap!</Text>
+                            <Text style={styles.doneText}>Kamu sudah mengirim bukti untuk Minggu {week}.</Text>
+                        </View>
+                    </View>
+                )}
+
                 <Text style={styles.sectionTitle}>Upload 3 Bukti Foto</Text>
                 
                 {/* 1. Makanan */}
@@ -289,8 +317,12 @@ export default function TanggungJawabScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity style={styles.btnSubmit} onPress={handleSubmit} disabled={loading}>
-                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Kirim Laporan</Text>}
+                <TouchableOpacity 
+                    style={[styles.btnSubmit, isDone && {backgroundColor: Colors.success}]} 
+                    onPress={handleSubmit} 
+                    disabled={loading}
+                >
+                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>{isDone ? "UPDATE LAPORAN" : "KIRIM LAPORAN"}</Text>}
                 </TouchableOpacity>
             </>
         )}
@@ -317,6 +349,12 @@ const styles = StyleSheet.create({
   modalItemDisabled: { backgroundColor: '#f9f9f9' },
   modalItemText: { fontSize: 16, color: '#333' },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.primary, marginTop: 10, marginBottom: 15, textDecorationLine: 'underline' },
+  
+  // STYLE BARU UNTUK BANNER SELESAI
+  doneBanner: { flexDirection: 'row', backgroundColor: '#2e7d32', padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 20, elevation: 3 },
+  doneTitle: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  doneText: { color: '#e8f5e9', fontSize: 12 },
+
   uploadCard: { marginBottom: 20 },
   uploadLabel: { fontSize: 14, marginBottom: 8, color: '#333', fontWeight: '500' },
   imagePicker: { height: 140, borderWidth: 1, borderColor: '#ccc', borderRadius: 12, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', backgroundColor: '#f9f9f9' },
