@@ -141,15 +141,6 @@ export default function BerandaScreen() {
                   color="#a55eea" 
                   onPress={() => handleProtectedPress('/riwayat')} 
                 />
-
-                {/* 5. MENU BARU: RIWAYAT LAPORAN */}
-                <MenuIcon 
-                  icon="document-text" 
-                  label="Laporan" 
-                  color="#ff9f43" 
-                  onPress={() => handleProtectedPress('/lapor')} 
-                />
-
             </View>
         </View>
 
